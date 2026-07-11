@@ -53,12 +53,22 @@ variable "owner" {
   description = "Person or team responsible for the deployed resources"
   type        = string
   default     = "cyrine"
+
+  validation {
+    condition     = length(trimspace(var.owner)) > 0
+    error_message = "owner must not be empty."
+  }
 }
 
 variable "cost_center" {
   description = "Cost tracking identifier"
   type        = string
   default     = "student-credit"
+
+  validation {
+    condition     = length(trimspace(var.cost_center)) > 0
+    error_message = "cost_center must not be empty."
+  }
 }
 
 variable "resource_group_names" {
@@ -74,4 +84,32 @@ variable "resource_group_names" {
     network    = "network"
     security   = "security"
   }
+}
+
+variable "workload_name" {
+  description = "Workload tag value shared across the landing zone foundation resources"
+  type        = string
+  default     = "landing-zone"
+
+  validation {
+    condition     = length(trimspace(var.workload_name)) > 0
+    error_message = "workload_name must not be empty."
+  }
+}
+
+variable "criticality" {
+  description = "Criticality tag applied to the landing zone foundation resources"
+  type        = string
+  default     = "low"
+
+  validation {
+    condition     = contains(["low", "medium", "high"], var.criticality)
+    error_message = "criticality must be low, medium, or high."
+  }
+}
+
+variable "additional_tags" {
+  description = "Additional tags merged with the default landing zone tags"
+  type        = map(string)
+  default     = {}
 }

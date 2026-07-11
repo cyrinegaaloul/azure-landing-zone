@@ -5,3 +5,9 @@ project_name = "alz"
 environment  = "dev"
 owner        = "cyrine"
 cost_center  = "student-credit"
+workload_name = "landing-zone"
+criticality   = "low"
+
+additional_tags = {
+  project_stage = "foundation"
+}
