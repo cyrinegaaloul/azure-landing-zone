@@ -1,0 +1,7 @@
+subscription_id = "YOUR-SUBSCRIPTION-ID"
+
+location     = "francecentral"
+project_name = "alz"
+environment  = "dev"
+owner        = "cyrine"
+cost_center  = "student-credit"

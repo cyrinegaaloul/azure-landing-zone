@@ -1,0 +1,24 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfplan
+
+# Terraform variable files pouvant contenir des données sensibles
+*.tfvars
+*.tfvars.json
+
+# Exception éventuelle pour un fichier d'exemple
+!*.tfvars.example
+
+# Azure CLI / credentials
+.azure/
+
+# VS Code
+.vscode/
+
+# Operating system
+Thumbs.db
+.DS_Store
