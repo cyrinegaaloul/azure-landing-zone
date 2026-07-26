@@ -1,0 +1,10 @@
+subscription_id = "YOUR-SUBSCRIPTION-ID"
+location        = "francecentral"
+project_name    = "alz"
+environment     = "dev"
+
+resource_group_name = "rg-security-alz-dev"
+
+enable_observability_demo = false
+prometheus_mode           = "self-managed"
+grafana_mode              = "dashboard-only"

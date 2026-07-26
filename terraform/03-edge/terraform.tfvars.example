@@ -1,0 +1,21 @@
+subscription_id = "YOUR-SUBSCRIPTION-ID"
+location        = "francecentral"
+project_name    = "alz"
+environment     = "dev"
+
+resource_group_name = "rg-security-alz-dev"
+
+common_tags = {
+  project     = "azure-landing-zone"
+  environment = "dev"
+  owner       = "cyrine"
+  cost_center = "student-credit"
+  managed_by  = "terraform"
+  criticality = "low"
+  workload    = "landing-zone"
+}
+
+enable_edge_stack = false
+edge_mode         = "deferred"
+waf_policy_mode   = "Prevention"
+apim_tier         = "Consumption"

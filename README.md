@@ -2,7 +2,7 @@
 
 **Design and Implementation of a Secure Azure Landing Zone Integrating AKS and Jelastic P4D within a DevSecOps Approach**.
 
-The current implementation is intentionally limited to the early Azure Landing Zone layers using Terraform and free or very low-cost Azure resources. These phases create the organizational and networking base that later modules will consume for security, workloads, and DevSecOps automation.
+The current implementation is intentionally limited to low-cost structural layers and cost-safe scaffolds for later phases. This lets the full project be prepared ahead of time while Azure spending stays near zero until the final demonstration window.
 
 ## Cost Constraint
 
@@ -16,15 +16,6 @@ The working rules for this repository are:
 - treat expensive services as late-phase demonstration components that should be deployed briefly and destroyed immediately afterward
 - warn before any recommendation that could actively consume Azure credits
 
-Examples of services that should not be deployed casually during development include:
-
-- AKS node pools
-- Application Gateway
-- WAF
-- API Management
-- Azure Monitor ingestion-heavy configurations
-- any always-on compute resource
-
 ## Current Scope
 
 The repository currently includes:
@@ -32,252 +23,156 @@ The repository currently includes:
 - `terraform/00-foundation`
 - `terraform/01-networking`
 - `terraform/02-security-baseline`
+- `terraform/03-edge`
+- `terraform/04-workloads`
+- `terraform/05-observability`
+- `terraform/06-devsecops`
+- `terraform/root`
+- `app/`
+- `.github/workflows/`
 
-The `terraform/00-foundation` module is responsible for:
+The implemented modules are split into two categories:
 
-- configuring the Terraform and AzureRM versions
-- validating reusable input variables
-- defining a consistent naming prefix
-- defining common tags for governance and cost visibility
-- creating three resource groups:
+- active low-cost modules:
   - foundation
-  - network
-  - security
-- exposing outputs that future modules can reuse
-
-The `terraform/01-networking` module is responsible for:
-
-- creating a landing zone virtual network
-- reserving subnets for future layers such as AKS, Application Gateway, APIM, and private endpoints
-- creating one NSG per subnet
-- exposing VNet, subnet, and NSG outputs for future modules
-
-The `terraform/02-security-baseline` module is responsible for:
-
-- defining resource-group scoped RBAC assignments
-- supporting optional management locks
-- exposing outputs for security baseline auditability
-
-Services such as AKS, Application Gateway, WAF, API Management, monitoring, Jelastic, CI/CD, Docker, and Kubernetes are intentionally excluded from the current implementation.
-
-Even when future Terraform code is prepared for those services, that does not mean they should be applied immediately in the student subscription.
+  - networking
+  - security baseline
+- deferred demo scaffolds:
+  - edge
+  - workloads
+  - observability
+  - devsecops
 
 ## Repository Structure
 
 ```text
 azure-landing-zone/
+|-- .github/
+|   `-- workflows/
+|       |-- demo-deploy.yml
+|       `-- validate.yml
 |-- app/
+|   |-- .dockerignore
+|   |-- Dockerfile
+|   |-- README.md
+|   |-- server.py
+|   |-- jelastic/
+|   |   `-- README.md
+|   `-- k8s/
+|       |-- deployment.yaml
+|       `-- service.yaml
 |-- docs/
 |   |-- architecture.md
-|   `-- networking.md
-|   `-- security-baseline.md
+|   |-- demo-runbook.md
+|   |-- devsecops.md
+|   |-- edge.md
+|   |-- networking.md
+|   |-- observability.md
+|   |-- orchestration.md
+|   |-- security-baseline.md
+|   `-- workloads.md
 |-- pipelines/
+|   `-- README.md
 |-- terraform/
 |   |-- 00-foundation/
-|   |   |-- main.tf
-|   |   |-- outputs.tf
-|   |   |-- providers.tf
-|   |   |-- terraform.tfvars
-|   |   `-- variables.tf
-|   `-- 01-networking/
-|       |-- main.tf
-|       |-- outputs.tf
-|       |-- providers.tf
-|       |-- terraform.tfvars.example
-|       `-- variables.tf
-|   `-- 02-security-baseline/
-|       |-- main.tf
-|       |-- outputs.tf
-|       |-- providers.tf
-|       |-- terraform.tfvars.example
-|       `-- variables.tf
+|   |-- 01-networking/
+|   |-- 02-security-baseline/
+|   |-- 03-edge/
+|   |-- 04-workloads/
+|   |-- 05-observability/
+|   |-- 06-devsecops/
+|   `-- root/
 `-- README.md
 ```
 
-## Why The Implementation Starts With Structure
+## Phase Summary
 
-These first modules follow Azure Landing Zone principles by establishing resource organization and segmentation before service deployment.
+### 1. Foundation
 
-The three resource groups create a clean separation of responsibilities:
+- creates the resource group structure
+- standardizes naming and tagging
+- establishes the base landing zone layout
 
-- `foundation`: reserved for shared landing zone bootstrap assets
-- `network`: reserved for future connectivity resources such as VNets and subnets
-- `security`: reserved for future security resources such as Key Vault and policy-related assets
+### 2. Networking
 
-This separation is lightweight, free to create, and prepares the project for future expansion without refactoring the naming or governance model.
+- creates the VNet
+- reserves subnets for future services
+- creates one NSG per subnet
 
-It also fits the student-budget constraint because Azure resource groups do not create meaningful recurring cost by themselves.
+### 3. Security Baseline
 
-The networking layer is also cost-conscious because VNets, subnets, and NSGs are structural resources and are much safer to model during development than always-on managed platform services.
+- supports resource-group scoped RBAC assignments
+- supports optional management locks
 
-The security baseline remains cost-aware because RBAC assignments and management locks improve governance without introducing continuously billed security products.
+### 4. Edge
 
-## Architecture Decisions
+- prepares Application Gateway, WAF, and APIM design choices
+- stays disabled by default to avoid cost during development
 
-### 1. Dedicated Foundation Module
+### 5. Workloads
 
-The repository starts with a dedicated `terraform/00-foundation` module because the first objective is to establish stable platform primitives before adding services.
+- prepares future AKS and Jelastic P4D deployment decisions
+- includes a small demo application with health and metrics endpoints
 
-Decision rationale:
+### 6. Observability
 
-- keeps the scope aligned with the current milestone
-- avoids mixing bootstrap resources with future networking or workload resources
-- supports incremental delivery and easier testing
+- prepares Prometheus and Grafana design choices
+- keeps ingestion-sensitive services deferred until demo time
 
-### 2. Standard Naming Prefix
+### 7. DevSecOps
 
-Resource names are built from:
+- includes validation-focused GitHub Actions workflows
+- keeps deployment manual and demo-only
 
-```text
-<logical-name>-<project-name>-<environment>
-```
+### 8. Root Orchestration
 
-Example:
+- composes all modules in one Terraform entrypoint
+- uses outputs from earlier phases to wire later phases
+- keeps expensive module toggles off by default
 
-```text
-rg-foundation-alz-dev
-```
+## Local Usage
 
-Decision rationale:
-
-- improves readability
-- avoids hardcoded one-off names
-- makes future modules consistent with the same naming scheme
-
-### 3. Common Tags For Governance
-
-The modules apply common tags such as:
-
-- `environment`
-- `owner`
-- `cost_center`
-- `managed_by`
-- `criticality`
-- `workload`
-
-Decision rationale:
-
-- supports governance and reporting
-- improves cost tracking
-- aligns future resources with the same metadata model
-
-### 4. Reusable Outputs
-
-The current modules export:
-
-- resource group names and IDs
-- the deployment location
-- the naming prefix
-- the resolved common tags
-- VNet, subnet, and NSG details for future consumers
-
-Decision rationale:
-
-- allows future modules to consume the outputs directly
-- reduces duplication between Terraform layers
-- improves maintainability as the landing zone grows
-
-### 5. Cost-Aware Incremental Delivery
-
-Expensive platform services are intentionally deferred. During development, the project focuses on low-cost structural layers first, then uses Terraform plans and documentation to model later phases before any real deployment happens.
-
-Decision rationale:
-
-- supports learning without consuming credits too early
-- keeps the repository aligned with the final architecture
-- allows expensive services to be deployed only for a short demonstration window
-
-### 6. Reserved Network Boundaries Before Workloads
-
-The networking module reserves subnet boundaries for future services such as AKS, Application Gateway, APIM, management access, and private endpoints before those services are created.
-
-Decision rationale:
-
-- avoids rework later when expensive services are finally introduced
-- supports better segmentation and future least-privilege controls
-- keeps the current implementation low-cost and architecture-focused
-
-### 7. Low-Cost Security Controls Before Security Products
-
-The security baseline starts with RBAC assignments and optional resource locks before introducing services such as Key Vault, WAF, or monitoring.
-
-Decision rationale:
-
-- improves governance while staying within the student budget
-- supports zero-trust and least-privilege concepts early
-- avoids activating paid services before the platform structure is stable
-
-## Usage
-
-### Foundation
+For day-to-day development, work from `terraform/root`.
 
 Initialize:
 
 ```powershell
-terraform -chdir=terraform/00-foundation init
+terraform -chdir=terraform/root init
 ```
 
-Plan:
+Plan the low-cost baseline:
 
 ```powershell
-terraform -chdir=terraform/00-foundation plan
+terraform -chdir=terraform/root plan -var-file=terraform.tfvars
 ```
 
-Apply:
+Prepare the final demo configuration:
 
 ```powershell
-terraform -chdir=terraform/00-foundation apply
+Copy-Item terraform\root\demo.tfvars.example terraform\root\demo.tfvars
 ```
 
-### Networking
-
-Initialize:
+Plan the final demo configuration:
 
 ```powershell
-terraform -chdir=terraform/01-networking init
+terraform -chdir=terraform/root plan -var-file=demo.tfvars
 ```
 
-Prepare variables by copying `terraform/01-networking/terraform.tfvars.example` to `terraform/01-networking/terraform.tfvars`.
-
-Plan:
+Only apply the demo configuration when you are ready to spend credits for a short-lived presentation:
 
 ```powershell
-terraform -chdir=terraform/01-networking plan -var-file=terraform.tfvars
+terraform -chdir=terraform/root apply -var-file=demo.tfvars
+terraform -chdir=terraform/root destroy -var-file=demo.tfvars
 ```
 
-Apply:
+## Pipeline Usage
 
-```powershell
-terraform -chdir=terraform/01-networking apply -var-file=terraform.tfvars
-```
+The repository contains two GitHub Actions workflows:
 
-### Security Baseline
+- `validate.yml` for default validation on pushes and pull requests
+- `demo-deploy.yml` for manual plan, apply, or destroy during the final demo window
 
-Initialize:
-
-```powershell
-terraform -chdir=terraform/02-security-baseline init
-```
-
-Prepare variables by copying `terraform/02-security-baseline/terraform.tfvars.example` to `terraform/02-security-baseline/terraform.tfvars`.
-
-Plan:
-
-```powershell
-terraform -chdir=terraform/02-security-baseline plan -var-file=terraform.tfvars
-```
-
-Apply:
-
-```powershell
-terraform -chdir=terraform/02-security-baseline apply -var-file=terraform.tfvars
-```
-
-Only run `apply` when you are ready to create Azure resources in the subscription. Even low-cost resources should be reviewed carefully against the available student credits.
-
-If you choose to test the networking module with `apply`, it is still wise to destroy the resources afterward to protect the student budget.
-
-## Cost Notes For Current Modules
+## Cost Notes
 
 - Resource Groups: effectively free structural resources
 - Virtual Network: generally no direct recurring charge for the VNet object itself
@@ -285,14 +180,10 @@ If you choose to test the networking module with `apply`, it is still wise to de
 - Network Security Groups: no direct recurring charge
 - Azure RBAC assignments: no separate direct service charge
 - management locks: no separate direct service charge
-
-Future cost typically comes from attached services, traffic patterns, or always-on managed components rather than from the current foundation and networking resources alone.
-
-## Next Planned Phase
-
-The next implementation phase should shift from low-cost platform structure to design preparation for higher-cost services only after foundation, networking, and the security baseline are validated.
-
-That preparation should stay cost-aware by modeling integrations, variables, and documentation before paid or always-on services are created.
+- Application Gateway and WAF: continuously billed while provisioned
+- API Management: tier-based or usage-based cost depending on SKU
+- AKS: underlying compute is billed when running
+- observability services: can become ingestion-cost sensitive
 
 ## Documentation
 
@@ -300,3 +191,9 @@ Phase 1 architecture notes are available in [docs/architecture.md](/abs/path/c:/
 
 The networking design is documented in [docs/networking.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/networking.md:1).
 The security baseline design is documented in [docs/security-baseline.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/security-baseline.md:1).
+The edge design is documented in [docs/edge.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/edge.md:1).
+The workloads design is documented in [docs/workloads.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/workloads.md:1).
+The observability design is documented in [docs/observability.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/observability.md:1).
+The DevSecOps design is documented in [docs/devsecops.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/devsecops.md:1).
+The root orchestration design is documented in [docs/orchestration.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/orchestration.md:1).
+The final demo procedure is documented in [docs/demo-runbook.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/demo-runbook.md:1).

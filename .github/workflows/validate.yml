@@ -1,0 +1,49 @@
+name: validate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        terraform_dir:
+          - terraform/00-foundation
+          - terraform/01-networking
+          - terraform/02-security-baseline
+          - terraform/03-edge
+          - terraform/04-workloads
+          - terraform/05-observability
+          - terraform/06-devsecops
+          - terraform/root
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.6
+
+      - name: Terraform fmt
+        run: terraform -chdir=${{ matrix.terraform_dir }} fmt -check
+
+      - name: Terraform init
+        run: terraform -chdir=${{ matrix.terraform_dir }} init -backend=false
+
+      - name: Terraform validate
+        run: terraform -chdir=${{ matrix.terraform_dir }} validate
+
+  application:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python syntax check
+        run: python -m py_compile app/server.py

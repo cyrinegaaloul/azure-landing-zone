@@ -1,0 +1,44 @@
+name: demo-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Choose which demo action to run"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+jobs:
+  terraform-demo:
+    runs-on: ubuntu-latest
+    environment: demo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.6
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Terraform init
+        run: terraform -chdir=terraform/root init
+
+      - name: Terraform plan
+        if: ${{ inputs.action == 'plan' }}
+        run: terraform -chdir=terraform/root plan -var-file=demo.tfvars
+
+      - name: Terraform apply
+        if: ${{ inputs.action == 'apply' }}
+        run: terraform -chdir=terraform/root apply -auto-approve -var-file=demo.tfvars
+
+      - name: Terraform destroy
+        if: ${{ inputs.action == 'destroy' }}
+        run: terraform -chdir=terraform/root destroy -auto-approve -var-file=demo.tfvars

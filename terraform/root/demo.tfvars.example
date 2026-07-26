@@ -1,0 +1,64 @@
+subscription_id = "YOUR-SUBSCRIPTION-ID"
+
+location     = "francecentral"
+project_name = "alz"
+environment  = "demo"
+owner        = "cyrine"
+cost_center  = "student-credit"
+
+workload_name = "landing-zone"
+criticality   = "medium"
+
+additional_tags = {
+  project_stage = "final-demo"
+}
+
+vnet_address_space = ["10.10.0.0/16"]
+
+subnets = {
+  management = {
+    address_prefixes = ["10.10.0.0/24"]
+    create_nsg       = true
+  }
+  private-endpoints = {
+    address_prefixes = ["10.10.1.0/24"]
+    create_nsg       = true
+  }
+  aks = {
+    address_prefixes = ["10.10.2.0/24"]
+    create_nsg       = true
+  }
+  appgw = {
+    address_prefixes = ["10.10.3.0/24"]
+    create_nsg       = true
+  }
+  apim = {
+    address_prefixes = ["10.10.4.0/24"]
+    create_nsg       = true
+  }
+}
+
+role_assignments     = {}
+resource_group_locks = {}
+
+enable_edge_stack = true
+edge_mode         = "demo"
+waf_policy_mode   = "Prevention"
+apim_tier         = "Consumption"
+
+enable_aks_demo      = true
+enable_jelastic_demo = true
+application_name     = "landing-zone-demo-app"
+container_image_name = "landing-zone-demo-app:latest"
+container_port       = 8080
+kubernetes_namespace = "demo"
+
+enable_observability_demo = true
+prometheus_mode           = "self-managed"
+grafana_mode              = "self-managed"
+
+enable_demo_deployments = true
+repository_name         = "azure-landing-zone"
+default_branch          = "main"
+terraform_root_path     = "terraform/root"
+application_path        = "app"
