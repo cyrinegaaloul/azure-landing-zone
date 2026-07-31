@@ -5,6 +5,8 @@ This application is a small Python HTTP service intended for local development a
 ## Endpoints
 
 - `/` returns application metadata
+- `/api/info` returns structured application and platform metadata
+- `/api/status` returns a simple project status payload
 - `/health` returns a health response for readiness and liveness checks
 - `/metrics` returns Prometheus-compatible metrics
 
@@ -17,8 +19,23 @@ python server.py
 Then open:
 
 - `http://localhost:8080/`
+- `http://localhost:8080/api/info`
+- `http://localhost:8080/api/status`
 - `http://localhost:8080/health`
 - `http://localhost:8080/metrics`
+
+## AKS Preparation
+
+The `k8s/` folder now includes:
+
+- `configmap.yaml`
+- `namespace.yaml`
+- `deployment.yaml`
+- `service.yaml`
+- `ingress-placeholder.yaml`
+- `README.md`
+
+These files are enough to explain a basic AKS deployment path in your project even before you create a real AKS cluster.
 
 ## Container Build
 
@@ -28,3 +45,13 @@ docker run -p 8080:8080 landing-zone-demo-app:latest
 ```
 
 Containerization is included for future AKS and Jelastic deployment preparation. Building the image locally does not consume Azure credits.
+
+## Why Python Here
+
+Python was chosen because this demo app uses only the standard library, which keeps the runtime simple:
+
+- no framework dependency is required
+- no package installation is required
+- the same app can still be containerized and deployed to AKS later
+
+The goal at this stage is to keep the application small and predictable while the infrastructure design is still evolving.

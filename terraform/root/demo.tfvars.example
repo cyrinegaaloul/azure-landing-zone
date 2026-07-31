@@ -41,23 +41,23 @@ subnets = {
 role_assignments     = {}
 resource_group_locks = {}
 
-enable_edge_stack = true
-edge_mode         = "demo"
+enable_edge_stack = false
+edge_mode         = "deferred"
 waf_policy_mode   = "Prevention"
 apim_tier         = "Consumption"
 
 enable_aks_demo      = true
-enable_jelastic_demo = true
+enable_jelastic_demo = false
 application_name     = "landing-zone-demo-app"
 container_image_name = "landing-zone-demo-app:latest"
 container_port       = 8080
 kubernetes_namespace = "demo"
 
-enable_observability_demo = true
+enable_observability_demo = false
 prometheus_mode           = "self-managed"
 grafana_mode              = "self-managed"
 
-enable_demo_deployments = true
+enable_demo_deployments = false
 repository_name         = "azure-landing-zone"
 default_branch          = "main"
 terraform_root_path     = "terraform/root"

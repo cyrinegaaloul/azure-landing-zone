@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: landing-zone-demo-app-config
+  namespace: demo
+data:
+  APP_NAME: landing-zone-demo-app
+  APP_ENV: demo
+  APP_VERSION: "0.1.0"

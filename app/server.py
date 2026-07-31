@@ -11,6 +11,29 @@ APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
 HOST = os.getenv("APP_HOST", "0.0.0.0")
 PORT = int(os.getenv("APP_PORT", "8080"))
 
+SAMPLE_SERVICES = [
+    {
+        "name": "foundation",
+        "status": "planned",
+        "description": "Resource groups, naming, and tags"
+    },
+    {
+        "name": "networking",
+        "status": "implemented",
+        "description": "VNet, subnets, and NSGs"
+    },
+    {
+        "name": "security-baseline",
+        "status": "implemented",
+        "description": "RBAC and optional resource locks"
+    },
+    {
+        "name": "aks",
+        "status": "deferred-demo",
+        "description": "Future workload target"
+    }
+]
+
 
 class DemoRequestHandler(BaseHTTPRequestHandler):
     def _send_json(self, payload, status=200):
@@ -41,8 +64,46 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if self.path == "/api/info":
+            self._send_json(
+                {
+                    "application": {
+                        "name": APP_NAME,
+                        "environment": APP_ENV,
+                        "version": APP_VERSION
+                    },
+                    "platform": {
+                        "runtime": "python-stdlib-httpserver",
+                        "container_ready": True,
+                        "kubernetes_ready": True
+                    },
+                    "project": {
+                        "title": "Secure Azure Landing Zone",
+                        "focus": "AKS-first, cost-aware final demo"
+                    }
+                }
+            )
+            return
+
+        if self.path == "/api/status":
+            self._send_json(
+                {
+                    "status": "ok",
+                    "uptime_seconds": round(time.time() - START_TIME, 2),
+                    "services": SAMPLE_SERVICES
+                }
+            )
+            return
+
         if self.path == "/health":
-            self._send_json({"status": "ok", "uptime_seconds": round(time.time() - START_TIME, 2)})
+            self._send_json(
+                {
+                    "status": "ok",
+                    "application": APP_NAME,
+                    "environment": APP_ENV,
+                    "uptime_seconds": round(time.time() - START_TIME, 2)
+                }
+            )
             return
 
         if self.path == "/metrics":
@@ -54,6 +115,9 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
                     "# HELP demo_app_uptime_seconds Uptime of the demo app in seconds.",
                     "# TYPE demo_app_uptime_seconds counter",
                     f"demo_app_uptime_seconds {round(time.time() - START_TIME, 2)}",
+                    "# HELP demo_app_services_total Number of tracked platform services in the demo response.",
+                    "# TYPE demo_app_services_total gauge",
+                    f"demo_app_services_total {len(SAMPLE_SERVICES)}",
                     ""
                 ]
             )

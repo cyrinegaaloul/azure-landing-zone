@@ -1,4 +1,4 @@
-subscription_id = "YOUR-SUBSCRIPTION-ID"
+subscription_id = "subscription-id"
 location        = "francecentral"
 project_name    = "alz"
 environment     = "dev"

@@ -2,21 +2,20 @@
 
 **Design and Implementation of a Secure Azure Landing Zone Integrating AKS and Jelastic P4D within a DevSecOps Approach**.
 
-The current implementation is intentionally limited to low-cost structural layers and cost-safe scaffolds for later phases. This lets the full project be prepared ahead of time while Azure spending stays near zero until the final demonstration window.
+This repository contains the infrastructure, application, and workflow assets for the project. The implementation is organized in phases so the platform can be assembled progressively and deployed when required.
 
-## Cost Constraint
+## Project Context
 
-This project is being developed on an **Azure for Students** subscription with a limited **$100 USD credit** budget. Cost optimization is therefore a primary architecture and implementation requirement.
+The project is being developed on an **Azure for Students** subscription with a limited **$100 USD credit** budget. Resource selection and deployment timing must therefore be controlled carefully.
 
-The working rules for this repository are:
+Working rules for the repository:
 
-- prefer free or very low-cost Azure resources during development
-- avoid continuously billed services unless they are explicitly required for a final demonstration
-- use Terraform validation workflows such as `fmt`, `init`, `validate`, and `plan` more often than `apply`
-- treat expensive services as late-phase demonstration components that should be deployed briefly and destroyed immediately afterward
-- warn before any recommendation that could actively consume Azure credits
+- use Terraform workflows such as `fmt`, `init`, `validate`, and `plan` during development
+- avoid creating continuously billed services until they are required
+- keep planning settings separated from deployment settings
+- review cloud-facing changes before running `apply`
 
-## Current Scope
+## Repository Scope
 
 The repository currently includes:
 
@@ -31,13 +30,13 @@ The repository currently includes:
 - `app/`
 - `.github/workflows/`
 
-The implemented modules are split into two categories:
+The modules fall into two groups:
 
-- active low-cost modules:
+- implemented platform layers:
   - foundation
   - networking
   - security baseline
-- deferred demo scaffolds:
+- planned service layers:
   - edge
   - workloads
   - observability
@@ -59,7 +58,10 @@ azure-landing-zone/
 |   |-- jelastic/
 |   |   `-- README.md
 |   `-- k8s/
+|       |-- configmap.yaml
 |       |-- deployment.yaml
+|       |-- ingress-placeholder.yaml
+|       |-- namespace.yaml
 |       `-- service.yaml
 |-- docs/
 |   |-- architecture.md
@@ -106,29 +108,30 @@ azure-landing-zone/
 
 ### 4. Edge
 
-- prepares Application Gateway, WAF, and APIM design choices
-- stays disabled by default to avoid cost during development
+- captures Application Gateway, WAF, and APIM design inputs
+- keeps the service layer separated from the current platform baseline
 
 ### 5. Workloads
 
-- prepares future AKS and Jelastic P4D deployment decisions
-- includes a small demo application with health and metrics endpoints
+- prepares AKS as the primary workload target
+- preserves Jelastic as an optional later comparison target
+- includes an application with health and metrics endpoints
 
 ### 6. Observability
 
-- prepares Prometheus and Grafana design choices
-- keeps ingestion-sensitive services deferred until demo time
+- captures Prometheus and Grafana design inputs
+- separates observability planning from current deployment scope
 
 ### 7. DevSecOps
 
 - includes validation-focused GitHub Actions workflows
-- keeps deployment manual and demo-only
+- defines a controlled deployment workflow
 
 ### 8. Root Orchestration
 
 - composes all modules in one Terraform entrypoint
 - uses outputs from earlier phases to wire later phases
-- keeps expensive module toggles off by default
+- centralizes environment-level settings
 
 ## Local Usage
 
@@ -140,25 +143,25 @@ Initialize:
 terraform -chdir=terraform/root init
 ```
 
-Plan the low-cost baseline:
+Plan the current root configuration:
 
 ```powershell
 terraform -chdir=terraform/root plan -var-file=terraform.tfvars
 ```
 
-Prepare the final demo configuration:
+Prepare an alternate configuration when needed:
 
 ```powershell
 Copy-Item terraform\root\demo.tfvars.example terraform\root\demo.tfvars
 ```
 
-Plan the final demo configuration:
+Plan the alternate configuration:
 
 ```powershell
 terraform -chdir=terraform/root plan -var-file=demo.tfvars
 ```
 
-Only apply the demo configuration when you are ready to spend credits for a short-lived presentation:
+Apply and destroy only when you are ready to create and later remove Azure resources:
 
 ```powershell
 terraform -chdir=terraform/root apply -var-file=demo.tfvars
@@ -169,8 +172,8 @@ terraform -chdir=terraform/root destroy -var-file=demo.tfvars
 
 The repository contains two GitHub Actions workflows:
 
-- `validate.yml` for default validation on pushes and pull requests
-- `demo-deploy.yml` for manual plan, apply, or destroy during the final demo window
+- `validate.yml` for validation on pushes and pull requests
+- `demo-deploy.yml` for manual plan, apply, or destroy operations
 
 ## Cost Notes
 
@@ -196,4 +199,4 @@ The workloads design is documented in [docs/workloads.md](/abs/path/c:/Users/USE
 The observability design is documented in [docs/observability.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/observability.md:1).
 The DevSecOps design is documented in [docs/devsecops.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/devsecops.md:1).
 The root orchestration design is documented in [docs/orchestration.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/orchestration.md:1).
-The final demo procedure is documented in [docs/demo-runbook.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/demo-runbook.md:1).
+The deployment procedure is documented in [docs/demo-runbook.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/demo-runbook.md:1).
