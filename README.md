@@ -200,3 +200,4 @@ The observability design is documented in [docs/observability.md](/abs/path/c:/U
 The DevSecOps design is documented in [docs/devsecops.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/devsecops.md:1).
 The root orchestration design is documented in [docs/orchestration.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/orchestration.md:1).
 The deployment procedure is documented in [docs/demo-runbook.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/demo-runbook.md:1).
+The image registry and secret strategy is documented in [docs/registry-and-secrets.md](/abs/path/c:/Users/USER/Documents/azure-landing-zone/docs/registry-and-secrets.md:1).

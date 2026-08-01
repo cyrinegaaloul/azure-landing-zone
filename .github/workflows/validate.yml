@@ -47,3 +47,15 @@ jobs:
 
       - name: Python syntax check
         run: python -m py_compile app/server.py
+
+      - name: Docker build
+        run: docker build -t landing-zone-demo-app:ci ./app
+
+      - name: Kubernetes manifests check
+        run: |
+          test -f app/k8s/namespace.yaml
+          test -f app/k8s/configmap.yaml
+          test -f app/k8s/deployment.yaml
+          test -f app/k8s/service.yaml
+          test -f app/k8s/secret-placeholder.yaml
+          test -f app/k8s/kustomization.yaml

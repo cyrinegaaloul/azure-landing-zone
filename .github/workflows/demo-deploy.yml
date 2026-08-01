@@ -14,9 +14,18 @@ on:
           - destroy
 
 jobs:
+  application-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build application image
+        run: docker build -t landing-zone-demo-app:demo ./app
+
   terraform-demo:
     runs-on: ubuntu-latest
     environment: demo
+    needs: application-build
     steps:
       - uses: actions/checkout@v4
 

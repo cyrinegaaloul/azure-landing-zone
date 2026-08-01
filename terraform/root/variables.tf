@@ -280,3 +280,51 @@ variable "application_path" {
   type        = string
   default     = "app"
 }
+
+variable "container_registry_mode" {
+  description = "Container registry approach for the application image"
+  type        = string
+  default     = "external"
+}
+
+variable "container_registry_server" {
+  description = "Container registry server used to store the application image"
+  type        = string
+  default     = ""
+}
+
+variable "image_pull_secret_name" {
+  description = "Kubernetes image pull secret name used when a private registry is selected"
+  type        = string
+  default     = "registry-pull-secret"
+}
+
+variable "configuration_mode" {
+  description = "Configuration delivery approach for the application"
+  type        = string
+  default     = "configmap"
+}
+
+variable "secret_mode" {
+  description = "Secret delivery approach for the application"
+  type        = string
+  default     = "kubernetes-secret"
+}
+
+variable "secret_names" {
+  description = "Logical secret names used by the application deployment"
+  type        = list(string)
+  default     = ["app-secrets"]
+}
+
+variable "image_tag_strategy" {
+  description = "Image tag strategy used by CI/CD"
+  type        = string
+  default     = "git-sha"
+}
+
+variable "kubernetes_manifest_path" {
+  description = "Kubernetes manifest path used by CI/CD"
+  type        = string
+  default     = "app/k8s"
+}

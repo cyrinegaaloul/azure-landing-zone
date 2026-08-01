@@ -1,5 +1,5 @@
 locals {
-  name_prefix = "${var.project_name}-${var.environment}"
+  name_prefix      = "${var.project_name}-${var.environment}"
   aks_cluster_name = coalesce(var.aks_cluster_name_override, "aks-${local.name_prefix}")
 
   aks_cluster_plan = {
@@ -17,24 +17,32 @@ locals {
   }
 
   application_plan = {
-    name            = var.application_name
-    image           = var.container_image_name
-    port            = var.container_port
-    namespace       = var.kubernetes_namespace
-    replica_count   = var.application_replica_count
-    service_type    = var.kubernetes_service_type
-    deployment_mode = (var.enable_aks_demo || var.enable_jelastic_demo) ? "planned-platform-target" : "local_only"
-    health_endpoint = "/health"
-    metrics_endpoint = "/metrics"
-    primary_target  = "aks"
+    name              = var.application_name
+    image             = var.container_image_name
+    registry_mode     = var.container_registry_mode
+    registry_server   = var.container_registry_server
+    image_pull_secret = var.image_pull_secret_name
+    port              = var.container_port
+    namespace         = var.kubernetes_namespace
+    replica_count     = var.application_replica_count
+    service_type      = var.kubernetes_service_type
+    deployment_mode   = (var.enable_aks_demo || var.enable_jelastic_demo) ? "planned-platform-target" : "local_only"
+    health_endpoint   = "/health"
+    metrics_endpoint  = "/metrics"
+    config_mode       = var.configuration_mode
+    secret_mode       = var.secret_mode
+    secret_names      = var.secret_names
+    primary_target    = "aks"
   }
 
   kubernetes_artifacts = {
-    namespace = "app/k8s/namespace.yaml"
-    configmap = "app/k8s/configmap.yaml"
-    deployment = "app/k8s/deployment.yaml"
-    service = "app/k8s/service.yaml"
+    namespace           = "app/k8s/namespace.yaml"
+    configmap           = "app/k8s/configmap.yaml"
+    secret_placeholder  = "app/k8s/secret-placeholder.yaml"
+    deployment          = "app/k8s/deployment.yaml"
+    service             = "app/k8s/service.yaml"
     ingress_placeholder = "app/k8s/ingress-placeholder.yaml"
+    kustomization       = "app/k8s/kustomization.yaml"
   }
 
   planned_workloads = {

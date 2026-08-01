@@ -54,18 +54,24 @@ module "edge" {
 module "workloads" {
   source = "../04-workloads"
 
-  subscription_id      = var.subscription_id
-  location             = module.foundation.location
-  project_name         = var.project_name
-  environment          = var.environment
-  resource_group_name  = module.foundation.resource_groups.foundation.name
-  common_tags          = module.foundation.common_tags
-  enable_aks_demo      = var.enable_aks_demo
-  enable_jelastic_demo = var.enable_jelastic_demo
-  application_name     = var.application_name
-  container_image_name = var.container_image_name
-  container_port       = var.container_port
-  kubernetes_namespace = var.kubernetes_namespace
+  subscription_id           = var.subscription_id
+  location                  = module.foundation.location
+  project_name              = var.project_name
+  environment               = var.environment
+  resource_group_name       = module.foundation.resource_groups.foundation.name
+  common_tags               = module.foundation.common_tags
+  enable_aks_demo           = var.enable_aks_demo
+  enable_jelastic_demo      = var.enable_jelastic_demo
+  application_name          = var.application_name
+  container_image_name      = var.container_image_name
+  container_registry_mode   = var.container_registry_mode
+  container_registry_server = var.container_registry_server
+  image_pull_secret_name    = var.image_pull_secret_name
+  container_port            = var.container_port
+  kubernetes_namespace      = var.kubernetes_namespace
+  configuration_mode        = var.configuration_mode
+  secret_mode               = var.secret_mode
+  secret_names              = var.secret_names
 }
 
 module "observability" {
@@ -84,12 +90,18 @@ module "observability" {
 module "devsecops" {
   source = "../06-devsecops"
 
-  subscription_id         = var.subscription_id
-  project_name            = var.project_name
-  environment             = var.environment
-  enable_demo_deployments = var.enable_demo_deployments
-  repository_name         = var.repository_name
-  default_branch          = var.default_branch
-  terraform_root_path     = var.terraform_root_path
-  application_path        = var.application_path
+  subscription_id           = var.subscription_id
+  project_name              = var.project_name
+  environment               = var.environment
+  enable_demo_deployments   = var.enable_demo_deployments
+  repository_name           = var.repository_name
+  default_branch            = var.default_branch
+  terraform_root_path       = var.terraform_root_path
+  application_path          = var.application_path
+  container_image_name      = var.container_image_name
+  container_registry_mode   = var.container_registry_mode
+  container_registry_server = var.container_registry_server
+  image_tag_strategy        = var.image_tag_strategy
+  kubernetes_manifest_path  = var.kubernetes_manifest_path
+  secret_strategy           = var.secret_mode
 }

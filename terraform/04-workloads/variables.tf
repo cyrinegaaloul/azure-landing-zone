@@ -53,6 +53,29 @@ variable "container_image_name" {
   default     = "landing-zone-demo-app:latest"
 }
 
+variable "container_registry_mode" {
+  description = "Container registry approach for the application image"
+  type        = string
+  default     = "external"
+
+  validation {
+    condition     = contains(["external", "acr", "local-only"], var.container_registry_mode)
+    error_message = "container_registry_mode must be external, acr, or local-only."
+  }
+}
+
+variable "container_registry_server" {
+  description = "Container registry server used to store the application image"
+  type        = string
+  default     = ""
+}
+
+variable "image_pull_secret_name" {
+  description = "Kubernetes image pull secret name used when a private registry is selected"
+  type        = string
+  default     = "registry-pull-secret"
+}
+
 variable "container_port" {
   description = "Container port exposed by the application"
   type        = number
@@ -115,4 +138,32 @@ variable "application_replica_count" {
   description = "Planned replica count for the application in AKS"
   type        = number
   default     = 1
+}
+
+variable "configuration_mode" {
+  description = "Configuration delivery approach for the application"
+  type        = string
+  default     = "configmap"
+
+  validation {
+    condition     = contains(["configmap", "envvars", "hybrid"], var.configuration_mode)
+    error_message = "configuration_mode must be configmap, envvars, or hybrid."
+  }
+}
+
+variable "secret_mode" {
+  description = "Secret delivery approach for the application"
+  type        = string
+  default     = "kubernetes-secret"
+
+  validation {
+    condition     = contains(["kubernetes-secret", "external-secret", "key-vault-csi"], var.secret_mode)
+    error_message = "secret_mode must be kubernetes-secret, external-secret, or key-vault-csi."
+  }
+}
+
+variable "secret_names" {
+  description = "Logical secret names used by the application deployment"
+  type        = list(string)
+  default     = ["app-secrets"]
 }
