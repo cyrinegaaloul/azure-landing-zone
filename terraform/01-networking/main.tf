@@ -1,7 +1,6 @@
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
-
-  vnet_name = coalesce(var.vnet_name_override, "vnet-${local.name_prefix}")
+  vnet_name   = "vnet-${var.project_name}-${var.environment}"
 
   subnet_config = {
     for subnet_name, subnet in var.subnets : subnet_name => merge(

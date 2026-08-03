@@ -1,5 +1,5 @@
 variable "subscription_id" {
-  description = "Azure subscription ID used for the deployment"
+  description = "Azure subscription ID used by the root provider"
   type        = string
 
   validation {
@@ -28,7 +28,7 @@ variable "location" {
 }
 
 variable "project_name" {
-  description = "Short project identifier used in Azure resource names and tags"
+  description = "Short project identifier used in Azure resource names"
   type        = string
   default     = "alz"
 
@@ -60,61 +60,6 @@ variable "owner" {
   }
 }
 
-variable "cost_center" {
-  description = "Cost tracking identifier"
-  type        = string
-  default     = "student-credit"
-
-  validation {
-    condition     = length(trimspace(var.cost_center)) > 0
-    error_message = "cost_center must not be empty."
-  }
-}
-
-variable "resource_group_names" {
-  description = "Logical names of the resource groups created by the foundation module"
-  type = object({
-    foundation = string
-    network    = string
-    security   = string
-  })
-
-  default = {
-    foundation = "foundation"
-    network    = "network"
-    security   = "security"
-  }
-}
-
-variable "workload_name" {
-  description = "Workload tag value shared across the landing zone resources"
-  type        = string
-  default     = "landing-zone"
-}
-
-variable "criticality" {
-  description = "Criticality tag applied to the landing zone resources"
-  type        = string
-  default     = "low"
-
-  validation {
-    condition     = contains(["low", "medium", "high"], var.criticality)
-    error_message = "criticality must be low, medium, or high."
-  }
-}
-
-variable "additional_tags" {
-  description = "Additional tags merged with the default landing zone tags"
-  type        = map(string)
-  default     = {}
-}
-
-variable "vnet_name_override" {
-  description = "Optional custom virtual network name. Leave null to use the standard naming pattern."
-  type        = string
-  default     = null
-}
-
 variable "vnet_address_space" {
   description = "Address space allocated to the landing zone virtual network"
   type        = list(string)
@@ -122,7 +67,7 @@ variable "vnet_address_space" {
 }
 
 variable "subnets" {
-  description = "Subnet definitions reserved for future landing zone layers"
+  description = "Subnet definitions reserved for landing zone layers"
   type = map(object({
     address_prefixes = list(string)
     create_nsg       = optional(bool, true)
@@ -173,158 +118,20 @@ variable "resource_group_locks" {
   default = {}
 }
 
-variable "enable_edge_stack" {
-  description = "Controls whether the future edge stack is intended for the final demo"
-  type        = bool
-  default     = false
-}
-
-variable "edge_mode" {
-  description = "Edge deployment mode for the final demo"
-  type        = string
-  default     = "deferred"
-}
-
-variable "waf_policy_mode" {
-  description = "Planned WAF policy mode for the future edge stack"
-  type        = string
-  default     = "Prevention"
-}
-
-variable "apim_tier" {
-  description = "Planned API Management tier for the final demo"
-  type        = string
-  default     = "Consumption"
-}
-
 variable "enable_aks_demo" {
-  description = "Controls whether AKS is intended to be enabled for the final demo"
+  description = "Controls whether the AKS cluster resource is enabled"
   type        = bool
   default     = false
 }
 
-variable "enable_jelastic_demo" {
-  description = "Controls whether Jelastic P4D is intended to be enabled for the final demo"
-  type        = bool
-  default     = false
-}
-
-variable "application_name" {
-  description = "Demo application name shared by future workloads"
-  type        = string
-  default     = "landing-zone-demo-app"
-}
-
-variable "container_image_name" {
-  description = "Future container image reference used by AKS and Jelastic"
-  type        = string
-  default     = "landing-zone-demo-app:latest"
-}
-
-variable "container_port" {
-  description = "Container port exposed by the demo application"
+variable "aks_node_count" {
+  description = "AKS node count"
   type        = number
-  default     = 8080
+  default     = 1
 }
 
-variable "kubernetes_namespace" {
-  description = "Future Kubernetes namespace for the demo application"
+variable "aks_node_vm_size" {
+  description = "AKS node VM size"
   type        = string
-  default     = "demo"
-}
-
-variable "enable_observability_demo" {
-  description = "Controls whether the observability stack is intended for the final demo"
-  type        = bool
-  default     = false
-}
-
-variable "prometheus_mode" {
-  description = "Planned Prometheus approach for the final demo"
-  type        = string
-  default     = "self-managed"
-}
-
-variable "grafana_mode" {
-  description = "Planned Grafana approach for the final demo"
-  type        = string
-  default     = "dashboard-only"
-}
-
-variable "enable_demo_deployments" {
-  description = "Controls whether deployment stages are intended to be active for the final demo"
-  type        = bool
-  default     = false
-}
-
-variable "repository_name" {
-  description = "Repository name used by CI/CD documentation and future automation"
-  type        = string
-  default     = "azure-landing-zone"
-}
-
-variable "default_branch" {
-  description = "Default Git branch used by CI/CD"
-  type        = string
-  default     = "main"
-}
-
-variable "terraform_root_path" {
-  description = "Terraform root module path used by CI/CD"
-  type        = string
-  default     = "terraform/root"
-}
-
-variable "application_path" {
-  description = "Application path used by CI/CD"
-  type        = string
-  default     = "app"
-}
-
-variable "container_registry_mode" {
-  description = "Container registry approach for the application image"
-  type        = string
-  default     = "external"
-}
-
-variable "container_registry_server" {
-  description = "Container registry server used to store the application image"
-  type        = string
-  default     = ""
-}
-
-variable "image_pull_secret_name" {
-  description = "Kubernetes image pull secret name used when a private registry is selected"
-  type        = string
-  default     = "registry-pull-secret"
-}
-
-variable "configuration_mode" {
-  description = "Configuration delivery approach for the application"
-  type        = string
-  default     = "configmap"
-}
-
-variable "secret_mode" {
-  description = "Secret delivery approach for the application"
-  type        = string
-  default     = "kubernetes-secret"
-}
-
-variable "secret_names" {
-  description = "Logical secret names used by the application deployment"
-  type        = list(string)
-  default     = ["app-secrets"]
-}
-
-variable "image_tag_strategy" {
-  description = "Image tag strategy used by CI/CD"
-  type        = string
-  default     = "git-sha"
-}
-
-variable "kubernetes_manifest_path" {
-  description = "Kubernetes manifest path used by CI/CD"
-  type        = string
-  default     = "app/k8s"
+  default     = "Standard_B2s"
 }

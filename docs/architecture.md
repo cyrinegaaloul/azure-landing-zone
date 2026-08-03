@@ -32,7 +32,6 @@ Excluded from Phase 1:
 - managed identities and RBAC assignments
 - Key Vault
 - AKS
-- Jelastic P4D
 - Application Gateway and WAF
 - API Management
 - monitoring and observability tooling

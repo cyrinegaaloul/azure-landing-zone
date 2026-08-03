@@ -14,5 +14,5 @@ This repository uses a cost-aware pipeline approach:
 ## Recommended Protection
 
 - require environment approval on the `demo` environment
-- only use `demo.tfvars` for short-lived final presentations
+- only use `terraform/root/terraform.tfvars` for controlled presentations
 - always follow `apply` with `destroy`

@@ -14,7 +14,6 @@ output "networking" {
     virtual_network         = module.networking.virtual_network
     subnets                 = module.networking.subnets
     network_security_groups = module.networking.network_security_groups
-    name_prefix             = module.networking.name_prefix
   }
 }
 
@@ -26,22 +25,9 @@ output "security_baseline" {
   }
 }
 
-output "edge" {
-  description = "Edge module outputs"
-  value       = module.edge.edge_plan
-}
-
 output "workloads" {
-  description = "Workloads module outputs"
-  value       = module.workloads.workload_plan
-}
-
-output "observability" {
-  description = "Observability module outputs"
-  value       = module.observability.observability_plan
-}
-
-output "devsecops" {
-  description = "DevSecOps module outputs"
-  value       = module.devsecops.devsecops_plan
+  description = "AKS workload module outputs"
+  value = {
+    aks_cluster = module.workloads.aks_cluster
+  }
 }

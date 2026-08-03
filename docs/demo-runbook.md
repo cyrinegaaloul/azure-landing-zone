@@ -7,17 +7,17 @@ Deploy the full demonstration stack only for a short time window, present the ar
 ## Recommended Sequence
 
 1. Merge the final code to `main`.
-2. Confirm `terraform/root/demo.tfvars` contains the demo configuration.
-3. Run `terraform plan -var-file=demo.tfvars`.
+2. Confirm `terraform/root/terraform.tfvars` contains the intended configuration.
+3. Run `terraform plan -var-file=terraform.tfvars`.
 4. Review cost-sensitive services before approval.
-5. Run `terraform apply -var-file=demo.tfvars`.
+5. Run `terraform apply -var-file=terraform.tfvars`.
 6. Demonstrate:
    - landing zone resource groups
    - networking segmentation
    - RBAC baseline
    - app health and metrics
    - future edge, workloads, and observability readiness
-7. Run `terraform destroy -var-file=demo.tfvars` immediately after the demo.
+7. Run `terraform destroy -var-file=terraform.tfvars` immediately after the demo.
 
 ## Demo Principles
 

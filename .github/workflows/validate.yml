@@ -15,10 +15,7 @@ jobs:
           - terraform/00-foundation
           - terraform/01-networking
           - terraform/02-security-baseline
-          - terraform/03-edge
           - terraform/04-workloads
-          - terraform/05-observability
-          - terraform/06-devsecops
           - terraform/root
     steps:
       - uses: actions/checkout@v4

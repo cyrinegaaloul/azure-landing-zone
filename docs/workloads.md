@@ -1,19 +1,18 @@
-# Phase 5 Workloads Design
+# Phase 4 Workloads Design
 
 ## Objective
 
-This phase prepares the workload layer with AKS as the primary deployment target.
+This phase defines the workload layer around AKS.
 
-## Planned Components
+## Implemented Scope
 
-- AKS as the primary cloud-native deployment target
-- Jelastic P4D as an optional later comparison target
-- one shared application image and port model
-
-## Cost Guidance
-
-AKS should remain disabled until deployment is required because underlying compute resources are billed while running. Jelastic P4D should remain optional and should not block the AKS-first project path.
+- a real `azurerm_kubernetes_cluster` resource in `terraform/04-workloads`
+- conditional creation through `enable_aks_demo`
+- subnet integration through the networking module output
+- node count and VM size as explicit inputs
 
 ## Current Repository State
 
-The Terraform module `terraform/04-workloads` captures AKS deployment assumptions such as cluster naming, node sizing, ingress strategy, service type, namespace, and replica count. The `app/` folder contains a small application service and Kubernetes manifests that can be used later with AKS.
+The Terraform module `terraform/04-workloads` now contains a real AKS resource definition. The root module passes the AKS subnet ID from `module.networking.subnets["aks"].id` and keeps AKS disabled by default in `terraform/root/terraform.tfvars`.
+
+The `app/` folder contains a small application service and Kubernetes manifests that can be used later with AKS.

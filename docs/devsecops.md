@@ -1,8 +1,8 @@
-# Phase 7 DevSecOps Design
+# DevSecOps Workflow Design
 
 ## Objective
 
-This phase prepares the delivery workflow so infrastructure and application changes can be validated continuously while deployments remain manually controlled.
+This document describes the repository delivery workflow so infrastructure and application changes can be validated continuously while deployments remain manually controlled.
 
 ## Planned Controls
 
@@ -16,4 +16,4 @@ This phase prepares the delivery workflow so infrastructure and application chan
 
 ## Current Repository State
 
-GitHub Actions workflows are included for validation and controlled deployment operations. The current delivery path now includes container build validation and a documented image/secret strategy in addition to Terraform checks.
+GitHub Actions workflows are included for validation and controlled deployment operations. The current delivery path includes container build validation in addition to Terraform checks.

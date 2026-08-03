@@ -1,15 +1,4 @@
-variable "subscription_id" {
-  description = "Azure subscription ID used for the deployment"
-  type        = string
-
-  validation {
-    condition     = can(regex("^[0-9a-fA-F-]{36}$", var.subscription_id))
-    error_message = "subscription_id must be a valid Azure subscription UUID."
-  }
-}
-
 variable "resource_groups" {
-  description = "Resource groups created by the foundation module keyed by logical name"
   type = map(object({
     name = string
     id   = string
@@ -24,7 +13,6 @@ variable "resource_groups" {
 }
 
 variable "role_assignments" {
-  description = "RBAC assignments keyed by a logical assignment name"
   type = map(object({
     scope_key            = string
     role_definition_name = string
@@ -43,7 +31,6 @@ variable "role_assignments" {
 }
 
 variable "resource_group_locks" {
-  description = "Optional management locks keyed by resource group logical name"
   type = map(object({
     level = string
     notes = optional(string, "Managed by Terraform")

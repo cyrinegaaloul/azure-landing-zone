@@ -1,5 +1,4 @@
 output "resource_groups" {
-  description = "Created resource groups with names and IDs for downstream modules"
   value = {
     foundation = {
       name = azurerm_resource_group.foundation.name
@@ -17,7 +16,7 @@ output "resource_groups" {
 }
 
 output "location" {
-  description = "Azure region used by the foundation module"
+  description = "Azure region shared across the landing zone modules"
   value       = var.location
 }
 
@@ -27,6 +26,6 @@ output "name_prefix" {
 }
 
 output "common_tags" {
-  description = "Resolved tags applied to the landing zone foundation resources"
+  description = "Common tags shared across landing zone resources"
   value       = local.common_tags
 }

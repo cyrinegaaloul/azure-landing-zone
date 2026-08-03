@@ -1,9 +1,0 @@
-subscription_id = "YOUR-SUBSCRIPTION-ID"
-project_name    = "alz"
-environment     = "dev"
-
-enable_demo_deployments = false
-repository_name         = "azure-landing-zone"
-default_branch          = "main"
-terraform_root_path     = "terraform/root"
-application_path        = "app"
