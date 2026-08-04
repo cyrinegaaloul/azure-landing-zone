@@ -19,3 +19,12 @@ output "resource_group_locks" {
     }
   }
 }
+
+output "key_vault" {
+  description = "Key Vault details when enabled, otherwise null"
+  value = var.enable_key_vault ? {
+    name      = azurerm_key_vault.main[0].name
+    id        = azurerm_key_vault.main[0].id
+    vault_uri = azurerm_key_vault.main[0].vault_uri
+  } : null
+}

@@ -21,7 +21,7 @@ output "location" {
 }
 
 output "name_prefix" {
-  description = "Standardized name prefix reused by future landing zone modules"
+  description = "Standardized name prefix for landing zone resources"
   value       = local.name_prefix
 }
 

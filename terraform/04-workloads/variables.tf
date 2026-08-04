@@ -1,48 +1,67 @@
 variable "location" {
-  description = "Azure region used for workload resources"
-  type        = string
+  type = string
 }
 
 variable "project_name" {
-  description = "Short project identifier used in Azure resource names"
-  type        = string
+  type = string
 }
 
 variable "environment" {
-  description = "Deployment environment"
-  type        = string
+  type = string
 }
 
 variable "resource_group_name" {
-  description = "Existing resource group reserved for workload resources"
-  type        = string
+  type = string
 }
 
 variable "common_tags" {
-  description = "Tags inherited from the foundation module"
-  type        = map(string)
-  default     = {}
+  type    = map(string)
+  default = {}
 }
 
 variable "enable_aks_demo" {
-  description = "Controls whether the AKS cluster resource is enabled"
+  type    = bool
+  default = false
+}
+
+variable "enable_key_vault" {
+  type    = bool
+  default = false
+}
+
+variable "enable_edge_stack" {
+  description = "Enables the managed AGIC add-on when AKS is also enabled"
   type        = bool
   default     = false
 }
 
-variable "aks_subnet_id" {
-  description = "Subnet ID reserved for AKS nodes"
+variable "application_gateway_id" {
+  description = "ID of the existing WAF_v2 Application Gateway used by AGIC"
   type        = string
+  default     = null
+
+  validation {
+    condition     = !var.enable_edge_stack || var.application_gateway_id != null
+    error_message = "application_gateway_id is required when enable_edge_stack is true."
+  }
+}
+
+variable "key_vault_id" {
+  description = "Key Vault resource ID used for the application identity role assignment"
+  type        = string
+  default     = null
+}
+
+variable "aks_subnet_id" {
+  type = string
 }
 
 variable "aks_node_count" {
-  description = "AKS node count"
-  type        = number
-  default     = 1
+  type    = number
+  default = 1
 }
 
 variable "aks_node_vm_size" {
-  description = "AKS node VM size"
-  type        = string
-  default     = "Standard_B2s"
+  type    = string
+  default = "Standard_B2s"
 }

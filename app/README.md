@@ -10,6 +10,10 @@ This application is a small Python HTTP service intended for local development a
 - `/health` returns a health response for readiness and liveness checks
 - `/metrics` returns Prometheus-compatible metrics
 
+`openapi.yaml` defines the public APIM contract for `/health`, `/api/info`, and
+`/api/status`. It intentionally omits `/metrics`, which remains an internal
+Prometheus scrape endpoint.
+
 ## Local Run
 
 ```powershell
@@ -30,12 +34,17 @@ The `k8s/` folder now includes:
 
 - `configmap.yaml`
 - `namespace.yaml`
+- `serviceaccount.yaml`
+- `secretproviderclass.yaml`
 - `deployment.yaml`
 - `service.yaml`
-- `ingress-placeholder.yaml`
+- `ingress.yaml`
+- `kustomization.yaml`
 - `README.md`
 
-These files are enough to explain a basic AKS deployment path in your project even before you create a real AKS cluster.
+The hostless `ingress.yaml` targets the existing ClusterIP Service through the
+managed Application Gateway ingress class. Application Gateway, AGIC, and AKS
+remain disabled and must exist before these manifests are applied.
 
 ## Container Build
 

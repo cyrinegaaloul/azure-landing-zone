@@ -1,16 +1,21 @@
 locals {
-  aks_cluster_name = "aks-${var.project_name}-${var.environment}"
-  aks_dns_prefix   = "aks${replace(var.project_name, "-", "")}${var.environment}"
+  aks_cluster_name           = "aks-${var.project_name}-${var.environment}"
+  aks_dns_prefix             = "aks${replace(var.project_name, "-", "")}${var.environment}"
+  workload_identity_name     = "id-app-${var.project_name}-${var.environment}"
+  kubernetes_namespace       = "demo"
+  kubernetes_service_account = "landing-zone-demo"
 }
 
 resource "azurerm_kubernetes_cluster" "aks" {
   count = var.enable_aks_demo ? 1 : 0
 
-  name                = local.aks_cluster_name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  dns_prefix          = local.aks_dns_prefix
-  sku_tier            = "Free"
+  name                      = local.aks_cluster_name
+  location                  = var.location
+  resource_group_name       = var.resource_group_name
+  dns_prefix                = local.aks_dns_prefix
+  sku_tier                  = "Free"
+  oidc_issuer_enabled       = true
+  workload_identity_enabled = true
 
   default_node_pool {
     name           = "system"
@@ -23,10 +28,50 @@ resource "azurerm_kubernetes_cluster" "aks" {
     type = "SystemAssigned"
   }
 
+  key_vault_secrets_provider {
+    secret_rotation_enabled = false
+  }
+
+  dynamic "ingress_application_gateway" {
+    for_each = var.enable_edge_stack ? [1] : []
+
+    content {
+      gateway_id = var.application_gateway_id
+    }
+  }
+
   network_profile {
     network_plugin    = "azure"
     load_balancer_sku = "standard"
   }
 
   tags = var.common_tags
+}
+
+resource "azurerm_user_assigned_identity" "app" {
+  count = var.enable_aks_demo ? 1 : 0
+
+  name                = local.workload_identity_name
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  tags                = var.common_tags
+}
+
+resource "azurerm_federated_identity_credential" "app" {
+  count = var.enable_aks_demo ? 1 : 0
+
+  name                      = "fic-${local.kubernetes_service_account}"
+  user_assigned_identity_id = azurerm_user_assigned_identity.app[0].id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = azurerm_kubernetes_cluster.aks[0].oidc_issuer_url
+  subject                   = "system:serviceaccount:${local.kubernetes_namespace}:${local.kubernetes_service_account}"
+}
+
+resource "azurerm_role_assignment" "key_vault_secrets_user" {
+  count = var.enable_aks_demo && var.enable_key_vault ? 1 : 0
+
+  scope                = var.key_vault_id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.app[0].principal_id
+  principal_type       = "ServicePrincipal"
 }

@@ -14,7 +14,7 @@ PORT = int(os.getenv("APP_PORT", "8080"))
 SAMPLE_SERVICES = [
     {
         "name": "foundation",
-        "status": "planned",
+        "status": "implemented",
         "description": "Resource groups, naming, and tags"
     },
     {
@@ -29,8 +29,8 @@ SAMPLE_SERVICES = [
     },
     {
         "name": "aks",
-        "status": "deferred-demo",
-        "description": "Future workload target"
+        "status": "prepared",
+        "description": "Conditional workload target"
     }
 ]
 
@@ -79,7 +79,7 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
                     },
                     "project": {
                         "title": "Secure Azure Landing Zone",
-                        "focus": "AKS-first, cost-aware final demo"
+                        "focus": "Layered, cost-aware final demo"
                     }
                 }
             )

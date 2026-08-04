@@ -48,3 +48,37 @@ resource "azurerm_subnet_network_security_group_association" "landing_zone" {
   subnet_id                 = azurerm_subnet.landing_zone[each.key].id
   network_security_group_id = each.value.id
 }
+
+resource "azurerm_network_security_rule" "landing_zone" {
+  for_each = var.nsg_rules
+
+  name                         = each.key
+  priority                     = each.value.priority
+  direction                    = each.value.direction
+  access                       = each.value.access
+  protocol                     = each.value.protocol
+  source_port_range            = each.value.source_port_range
+  destination_port_ranges      = each.value.destination_port_ranges
+  source_address_prefix        = each.value.source_subnet_key == null ? each.value.source_address_prefix : null
+  source_address_prefixes      = each.value.source_subnet_key == null ? null : try(var.subnets[each.value.source_subnet_key].address_prefixes, [])
+  destination_address_prefix   = each.value.destination_subnet_key == null ? each.value.destination_address_prefix : null
+  destination_address_prefixes = each.value.destination_subnet_key == null ? null : try(var.subnets[each.value.destination_subnet_key].address_prefixes, [])
+  resource_group_name          = var.resource_group_name
+  network_security_group_name  = try(azurerm_network_security_group.landing_zone[each.value.nsg_key].name, "invalid-nsg-key")
+  description                  = each.value.description
+
+  lifecycle {
+    precondition {
+      condition     = contains(keys(azurerm_network_security_group.landing_zone), each.value.nsg_key)
+      error_message = "NSG rule ${each.key} targets an unknown subnet NSG key."
+    }
+
+    precondition {
+      condition = (
+        (each.value.source_subnet_key == null || contains(keys(var.subnets), each.value.source_subnet_key)) &&
+        (each.value.destination_subnet_key == null || contains(keys(var.subnets), each.value.destination_subnet_key))
+      )
+      error_message = "NSG rule ${each.key} references an unknown source or destination subnet key."
+    }
+  }
+}

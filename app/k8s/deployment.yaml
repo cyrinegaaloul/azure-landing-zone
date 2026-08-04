@@ -16,11 +16,25 @@ spec:
         app: landing-zone-demo-app
         app.kubernetes.io/name: landing-zone-demo-app
         app.kubernetes.io/part-of: landing-zone-demo
+        azure.workload.identity/use: "true"
     spec:
+      serviceAccountName: landing-zone-demo
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: landing-zone-demo-app
-          image: landing-zone-demo-app:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/cyrinegaaloul/landing-zone-demo-app:latest
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false # No additional process privileges
+            capabilities:
+              drop:
+                - ALL # No additional Linux capabilities
+            readOnlyRootFilesystem: true
           envFrom:
             - configMapRef:
                 name: landing-zone-demo-app-config
@@ -52,3 +66,14 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
             failureThreshold: 12
+          volumeMounts: # Mount the CSI volume inside the container
+            - name: secrets-store-inline
+              mountPath: /mnt/secrets-store
+              readOnly: true
+      volumes:
+        - name: secrets-store-inline
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: landing-zone-demo

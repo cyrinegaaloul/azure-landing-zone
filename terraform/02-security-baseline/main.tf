@@ -16,3 +16,20 @@ resource "azurerm_management_lock" "resource_group" {
   lock_level = each.value.level
   notes      = each.value.notes
 }
+
+resource "azurerm_key_vault" "main" {
+  count = var.enable_key_vault ? 1 : 0
+
+  name                          = "kv-${var.project_name}-${var.environment}"
+  location                      = var.location
+  resource_group_name           = var.resource_groups["security"].name
+  tenant_id                     = var.tenant_id
+  sku_name                      = "standard"
+  rbac_authorization_enabled    = true
+  soft_delete_retention_days    = 7
+  purge_protection_enabled      = false
+  public_network_access_enabled = true
+  tags                          = var.common_tags
+
+  # Private networking remains deferred to a future approved deployment stage.
+}

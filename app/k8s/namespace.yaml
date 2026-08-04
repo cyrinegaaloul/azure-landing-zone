@@ -3,4 +3,4 @@ kind: Namespace
 metadata:
   name: demo
   labels:
-    app.kubernetes.io/part-of: landing-zone-demo
+    app.kubernetes.io/part-of: landing-zone-demo # Groups the application resources

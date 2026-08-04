@@ -12,6 +12,56 @@ variable "resource_groups" {
   }
 }
 
+variable "location" {
+  description = "Azure region used by security baseline resources"
+  type        = string
+}
+
+variable "project_name" {
+  description = "Short project identifier used in Azure resource names"
+  type        = string
+
+  validation {
+    condition = (
+      can(regex("^[a-z0-9][a-z0-9-]{0,13}[a-z0-9]$", var.project_name)) &&
+      !strcontains(var.project_name, "--")
+    )
+    error_message = "project_name must contain 2 to 15 lowercase letters, numbers, or single hyphens, and must start and end with a letter or number."
+  }
+}
+
+variable "environment" {
+  description = "Deployment environment"
+  type        = string
+
+  validation {
+    condition     = contains(["dev", "test", "prod"], var.environment)
+    error_message = "environment must be dev, test, or prod."
+  }
+}
+
+variable "tenant_id" {
+  description = "Microsoft Entra tenant ID used by Azure Key Vault"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.tenant_id))
+    error_message = "tenant_id must be a valid UUID."
+  }
+}
+
+variable "common_tags" {
+  description = "Tags inherited from the foundation module"
+  type        = map(string)
+  default     = {}
+}
+
+variable "enable_key_vault" {
+  description = "Controls whether the landing zone Key Vault is enabled"
+  type        = bool
+  default     = false
+}
+
 variable "role_assignments" {
   type = map(object({
     scope_key            = string

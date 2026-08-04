@@ -6,11 +6,11 @@ crash.log
 crash.*.log
 *.tfplan
 
-# Terraform variable files pouvant contenir des données sensibles
+# Terraform variable files that may contain sensitive values
 *.tfvars
 *.tfvars.json
 
-# Exception éventuelle pour un fichier d'exemple
+# Keep documented example variable files
 !*.tfvars.example
 
 # Azure CLI / credentials

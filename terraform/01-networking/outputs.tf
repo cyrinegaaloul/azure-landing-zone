@@ -24,3 +24,17 @@ output "network_security_groups" {
     }
   }
 }
+
+output "network_security_rules" {
+  description = "Created NSG rules and their review-relevant attributes"
+  value = {
+    for rule_name, rule in azurerm_network_security_rule.landing_zone : rule_name => {
+      name              = rule.name
+      target_nsg        = rule.network_security_group_name
+      direction         = rule.direction
+      priority          = rule.priority
+      access            = rule.access
+      destination_ports = rule.destination_port_ranges
+    }
+  }
+}

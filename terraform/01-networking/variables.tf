@@ -93,3 +93,51 @@ variable "subnets" {
     error_message = "subnets must define at least one subnet."
   }
 }
+
+variable "nsg_rules" {
+  description = "NSG rules keyed by logical rule name; subnet keys resolve to CIDRs from var.subnets"
+  type = map(object({
+    nsg_key                    = string
+    priority                   = number
+    direction                  = string
+    access                     = optional(string, "Allow")
+    protocol                   = optional(string, "Tcp")
+    source_port_range          = optional(string, "*")
+    destination_port_ranges    = list(string)
+    source_address_prefix      = optional(string)
+    source_subnet_key          = optional(string)
+    destination_address_prefix = optional(string)
+    destination_subnet_key     = optional(string)
+    description                = string
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for rule in values(var.nsg_rules) :
+      contains(["Inbound", "Outbound"], rule.direction) &&
+      contains(["Allow", "Deny"], rule.access) &&
+      contains(["Tcp", "Udp", "Icmp", "*"], rule.protocol) &&
+      rule.priority >= 100 && rule.priority <= 4096 &&
+      length(rule.destination_port_ranges) > 0
+    ])
+    error_message = "Each NSG rule must use a supported direction, access, and protocol, priority 100-4096, and at least one destination port."
+  }
+
+  validation {
+    condition = alltrue([
+      for rule in values(var.nsg_rules) :
+      (rule.source_address_prefix == null) != (rule.source_subnet_key == null) &&
+      (rule.destination_address_prefix == null) != (rule.destination_subnet_key == null)
+    ])
+    error_message = "Each NSG rule must set exactly one source selector and one destination selector, using either an address prefix or a subnet key."
+  }
+
+  validation {
+    condition = length(distinct([
+      for rule in values(var.nsg_rules) :
+      "${rule.nsg_key}:${rule.direction}:${rule.priority}"
+    ])) == length(var.nsg_rules)
+    error_message = "NSG rule priorities must be unique within each target NSG and direction."
+  }
+}

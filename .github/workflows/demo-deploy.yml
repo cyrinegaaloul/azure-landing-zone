@@ -12,42 +12,74 @@ on:
           - plan
           - apply
           - destroy
+      enable_aks:
+        description: "Enable the billable AKS demo resources"
+        required: true
+        default: false
+        type: boolean
+      enable_edge:
+        description: "Enable the billable Application Gateway WAF_v2 edge stack"
+        required: true
+        default: false
+        type: boolean
+      enable_apim:
+        description: "Enable billable Developer-tier API Management (requires edge)"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
 
 jobs:
-  application-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build application image
-        run: docker build -t landing-zone-demo-app:demo ./app
-
   terraform-demo:
     runs-on: ubuntu-latest
     environment: demo
-    needs: application-build
+    env:
+      TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+      TF_VAR_location: francecentral
+      TF_VAR_project_name: alz
+      TF_VAR_environment: dev
+      TF_VAR_owner: cyrine
+      TF_VAR_role_assignments: '{}'
+      TF_VAR_resource_group_locks: '{}'
+      TF_VAR_enable_key_vault: false
+      TF_VAR_enable_management_access: false
+      TF_VAR_enable_edge_stack: ${{ inputs.enable_edge }}
+      TF_VAR_waf_policy_mode: Detection
+      TF_VAR_enable_apim: ${{ inputs.enable_apim }}
+      TF_VAR_apim_sku_name: Developer_1
+      TF_VAR_enable_aks_demo: ${{ inputs.enable_aks }}
+      TF_VAR_aks_node_count: 1
+      TF_VAR_aks_node_vm_size: Standard_B2s
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.14.6
 
-      - uses: azure/login@v2
+      - name: Log in to Azure
+        uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+        # Future hardening: replace this credentials JSON with GitHub OIDC
+        # federation after configuring the required Azure identity resources.
 
       - name: Terraform init
         run: terraform -chdir=terraform/root init
 
       - name: Terraform plan
         if: ${{ inputs.action == 'plan' }}
-        run: terraform -chdir=terraform/root plan -var-file=terraform.tfvars
+        run: terraform -chdir=terraform/root plan
 
       - name: Terraform apply
         if: ${{ inputs.action == 'apply' }}
-        run: terraform -chdir=terraform/root apply -auto-approve -var-file=terraform.tfvars
+        run: terraform -chdir=terraform/root apply -auto-approve
 
       - name: Terraform destroy
         if: ${{ inputs.action == 'destroy' }}
-        run: terraform -chdir=terraform/root destroy -auto-approve -var-file=terraform.tfvars
+        run: terraform -chdir=terraform/root destroy -auto-approve

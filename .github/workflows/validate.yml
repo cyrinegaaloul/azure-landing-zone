@@ -6,39 +6,56 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        terraform_dir:
-          - terraform/00-foundation
-          - terraform/01-networking
-          - terraform/02-security-baseline
-          - terraform/04-workloads
-          - terraform/root
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.14.6
 
-      - name: Terraform fmt
-        run: terraform -chdir=${{ matrix.terraform_dir }} fmt -check
+      - name: Terraform format check
+        run: terraform fmt -check -recursive
 
       - name: Terraform init
-        run: terraform -chdir=${{ matrix.terraform_dir }} init -backend=false
+        working-directory: terraform/root
+        run: terraform init -backend=false
 
       - name: Terraform validate
-        run: terraform -chdir=${{ matrix.terraform_dir }} validate
+        working-directory: terraform/root
+        run: terraform validate
+
+      - name: Set up Trivy
+        uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514 # v0.2.6
+        with:
+          version: v0.73.0
+          cache: true
+
+      - name: Scan Terraform configuration
+        run: >-
+          trivy config
+          --format table
+          --severity HIGH,CRITICAL
+          --exit-code 1
+          terraform
 
   application:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
@@ -48,11 +65,71 @@ jobs:
       - name: Docker build
         run: docker build -t landing-zone-demo-app:ci ./app
 
-      - name: Kubernetes manifests check
+      - name: Set up Trivy
+        uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514 # v0.2.6
+        with:
+          version: v0.73.0
+          cache: true
+
+      - name: Scan Docker image
+        run: >-
+          trivy image
+          --scanners vuln
+          --format table
+          --severity HIGH,CRITICAL
+          --exit-code 1
+          landing-zone-demo-app:ci
+
+      - name: Install kubeconform
+        env:
+          KUBECONFORM_VERSION: v0.7.0
         run: |
-          test -f app/k8s/namespace.yaml
-          test -f app/k8s/configmap.yaml
-          test -f app/k8s/deployment.yaml
-          test -f app/k8s/service.yaml
-          test -f app/k8s/secret-placeholder.yaml
-          test -f app/k8s/kustomization.yaml
+          curl --fail --location --show-error \
+            --output kubeconform.tar.gz \
+            "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          tar -xzf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Render Kubernetes manifests
+        run: kubectl kustomize app/k8s > "$RUNNER_TEMP/rendered-manifests.yaml"
+
+      - name: Validate Kubernetes manifests
+        run: >-
+          kubeconform
+          -strict
+          -summary
+          -skip SecretProviderClass
+          "$RUNNER_TEMP/rendered-manifests.yaml"
+
+      - name: Scan Kubernetes configuration
+        run: |
+          trivy config \
+            --format table \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            "$RUNNER_TEMP/rendered-manifests.yaml"
+
+      - name: Validate repository YAML syntax
+        run: >-
+          ruby -rpsych -e
+          'ARGV.each { |path| Psych.parse_stream(File.read(path)); puts "Valid YAML: #{path}" }'
+          app/openapi.yaml monitoring/*.yaml
+
+      - name: Validate ServiceMonitor manifest
+        run: >-
+          kubeconform
+          -strict
+          -summary
+          -skip ServiceMonitor
+          monitoring/servicemonitor.yaml
+
+      - name: Validate Grafana dashboard JSON
+        run: python -m json.tool monitoring/grafana-dashboard.json > /dev/null
+
+      - name: Scan monitoring configuration
+        run: >-
+          trivy config
+          --format table
+          --severity HIGH,CRITICAL
+          --exit-code 1
+          monitoring

@@ -1,0 +1,44 @@
+openapi: 3.0.3
+info:
+  title: Landing Zone Demo API
+  version: 1.0.0
+  description: >-
+    Public API surface for the demo application. Internal observability
+    endpoints are intentionally not published through API Management.
+paths:
+  /health:
+    get:
+      summary: Check application health
+      operationId: getHealth
+      responses:
+        "200":
+          description: The application is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/info:
+    get:
+      summary: Get application information
+      operationId: getApiInfo
+      responses:
+        "200":
+          description: Application information.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/status:
+    get:
+      summary: Get application status
+      operationId: getApiStatus
+      responses:
+        "200":
+          description: Current application status.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true

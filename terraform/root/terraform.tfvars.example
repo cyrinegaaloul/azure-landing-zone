@@ -1,4 +1,5 @@
-subscription_id = "YOUR-SUBSCRIPTION-ID"
+subscription_id = "00000000-0000-0000-0000-000000000000"
+tenant_id       = "00000000-0000-0000-0000-000000000000"
 
 location     = "francecentral"
 project_name = "alz"
@@ -30,8 +31,15 @@ subnets = {
   }
 }
 
-role_assignments     = {}
-resource_group_locks = {}
+role_assignments         = {}
+resource_group_locks     = {}
+enable_key_vault         = false
+# The approved nsg_rules defaults resolve subnet CIDRs from the subnets map.
+enable_management_access = false
+enable_edge_stack        = false
+waf_policy_mode          = "Detection"
+enable_apim              = false
+apim_sku_name            = "Developer_1"
 
 enable_aks_demo  = false
 aks_node_count   = 1

@@ -3,11 +3,14 @@ kind: Service
 metadata:
   name: landing-zone-demo-app
   namespace: demo
+  labels:
+    app: landing-zone-demo-app
 spec:
   selector:
     app: landing-zone-demo-app
   ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 8080
+    - name: http # Referenced by Prometheus and Ingress
+      protocol: TCP
+      port: 80 # Service port
+      targetPort: 8080 # Pod port
   type: ClusterIP

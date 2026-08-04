@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: landing-zone-demo-app
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: landing-zone-demo-app
+    app.kubernetes.io/part-of: landing-zone-demo-monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - demo
+  selector:
+    matchLabels:
+      app: landing-zone-demo-app
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+

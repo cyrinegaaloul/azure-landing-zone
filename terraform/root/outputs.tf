@@ -14,6 +14,7 @@ output "networking" {
     virtual_network         = module.networking.virtual_network
     subnets                 = module.networking.subnets
     network_security_groups = module.networking.network_security_groups
+    network_security_rules  = module.networking.network_security_rules
   }
 }
 
@@ -22,12 +23,26 @@ output "security_baseline" {
   value = {
     role_assignments     = module.security_baseline.role_assignments
     resource_group_locks = module.security_baseline.resource_group_locks
+    key_vault            = module.security_baseline.key_vault
   }
+}
+
+output "edge" {
+  description = "Application Gateway edge resources when enabled, otherwise null"
+  value       = module.edge.edge
+}
+
+output "apim" {
+  description = "API Management resources when enabled, otherwise null"
+  value       = module.apim.apim
 }
 
 output "workloads" {
   description = "AKS workload module outputs"
   value = {
-    aks_cluster = module.workloads.aks_cluster
+    aks_cluster                  = module.workloads.aks_cluster
+    workload_identity            = module.workloads.workload_identity
+    key_vault_role_assignment_id = module.workloads.key_vault_role_assignment_id
+    agic_identity                = module.workloads.agic_identity
   }
 }

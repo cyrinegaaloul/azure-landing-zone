@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: landing-zone-demo-app
+  namespace: demo
+  annotations:
+    kubernetes.io/ingress.class: azure/application-gateway # AGIC
+    appgw.ingress.kubernetes.io/health-probe-path: /health
+spec:
+  ingressClassName: azure-application-gateway
+  rules:
+    - http:
+        paths:
+          - path: / # Every application path
+            pathType: Prefix
+            backend: # Destination for matching requests
+              service:
+                name: landing-zone-demo-app
+                port:
+                  name: http
