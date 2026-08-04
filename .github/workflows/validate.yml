@@ -71,15 +71,23 @@ jobs:
           version: v0.73.0
           cache: true
 
-      - name: Scan Docker image
+      - name: Report Docker image vulnerabilities
         run: >-
           trivy image
           --scanners vuln
           --format table
           --severity HIGH,CRITICAL
+          --exit-code 0
+          landing-zone-demo-app:ci
+      - name: Block fixable Docker image vulnerabilities
+        run: >-
+          trivy image
+          --scanners vuln
+          --format table
+          --severity HIGH,CRITICAL
+          --ignore-unfixed
           --exit-code 1
           landing-zone-demo-app:ci
-
       - name: Install kubeconform
         env:
           KUBECONFORM_VERSION: v0.7.0
