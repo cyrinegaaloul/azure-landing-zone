@@ -1,24 +1,35 @@
 # Kubernetes Resilience Tests
 
-These small PowerShell scripts demonstrate application recovery and Deployment
-controls after the landing-zone infrastructure and Kubernetes manifests have
-been deployed. They are not run by CI and must not be used before checking the
-active Kubernetes context.
+This directory contains manually invoked PowerShell tests for the deployed
+application workload. The scripts validate Kubernetes controller behavior; they
+are not part of CI and do not provision infrastructure.
+
+## Contents
+
+| Script | Purpose | Final state |
+|---|---|---|
+| `pod-recovery.ps1` | Deletes one application pod and verifies that the Deployment creates a Ready replacement. | One healthy replica |
+| `scale-test.ps1` | Scales the Deployment from one replica to two and verifies both are Ready. | Restored to one replica |
+| `rollout-rollback.ps1` | Updates the application image and optionally restores the previous revision. | Selected image or previous revision |
+
+All scripts target:
+
+- namespace: `demo`
+- Deployment: `landing-zone-demo-app`
+- container: `landing-zone-demo-app`
 
 ## Prerequisites
 
-- The conditional AKS infrastructure and the resources in `app/k8s` are deployed.
-- `kubectl` is installed and authenticated to the intended cluster.
-- The current context points to the demonstration cluster; verify it with
-  `kubectl config current-context`.
-- The `demo` namespace contains Deployment `landing-zone-demo-app` with one
-  healthy replica.
-- Your Kubernetes identity can read, delete, scale, and update the Deployment
-  and its pods.
-- For the rollout test, the requested tag exists in
-  `ghcr.io/cyrinegaaloul/landing-zone-demo-app` and the cluster can pull it.
+- AKS and the manifests in `app/k8s` are deployed.
+- `kubectl` is installed and authenticated.
+- `kubectl config current-context` identifies the intended cluster.
+- The application Deployment starts with one healthy replica.
+- The current Kubernetes identity can read, delete, scale, and update the
+  Deployment and its pods.
+- The image tag supplied to the rollout test exists in GHCR and is pullable by
+  the cluster.
 
-Run the commands below from the repository root in PowerShell.
+Run the scripts from the repository root in PowerShell.
 
 ## Pod Recovery
 
@@ -26,42 +37,36 @@ Run the commands below from the repository root in PowerShell.
 .\tests\resilience\pod-recovery.ps1
 ```
 
-The script finds and displays the application pod, asks for confirmation,
-deletes it, and waits up to three minutes for the Deployment controller to
-create a different Ready pod.
+After confirmation, the script deletes the current pod and waits up to 180
+seconds for a different pod to become Ready. A successful test prints `PASSED`
+and the replacement pod name.
 
-Expected result: the original pod disappears and the script prints `PASSED`
-with the replacement pod name.
-
-## Scale Test
+## Replica Scaling
 
 ```powershell
 .\tests\resilience\scale-test.ps1
 ```
 
-The script verifies that the Deployment starts at one replica, scales it to two,
-waits until both pods are Ready, and reports success. It then restores the
-Deployment to one replica and waits for it to stabilize.
-
-Expected result: two Ready pods are observed temporarily, `PASSED` is printed,
-and the Deployment finishes with one replica.
+The script requires an initial replica count of one. It scales to two replicas,
+waits for the Deployment rollout, verifies two Ready replicas, and restores the
+replica count to one.
 
 ## Rollout and Rollback
 
-Use an existing immutable image tag, such as a commit SHA:
+Pass an existing immutable image tag:
 
 ```powershell
 .\tests\resilience\rollout-rollback.ps1 -ImageTag "0123456789abcdef"
 ```
 
-The script displays the current and requested images, updates the application
-container, and waits for the rollout. It then asks whether to run
-`kubectl rollout undo`. Enter `yes` to restore the previous Deployment revision;
-any other response leaves the new image deployed.
+The script updates the Deployment image and waits for rollout completion. Enter
+`yes` at the prompt to run `kubectl rollout undo`; any other response retains
+the new image.
 
-Expected result: the new image rolls out successfully. If rollback is selected,
-the previous revision is restored and becomes ready.
+## Operational Considerations
 
-These scripts intentionally make temporary changes to the live demonstration
-workload. Execute them only after the final infrastructure deployment, observe
-the results, and complete the project teardown afterward.
+- Review the active Kubernetes context before each test.
+- Run one test at a time.
+- Do not run the scale test when the Deployment is managed by an autoscaler.
+- Use an image tag that is compatible with the existing probes and container
+  configuration.

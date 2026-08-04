@@ -1,66 +1,69 @@
-# Demo Application
+# Application
 
-This application is a small Python HTTP service intended for local development and future deployment to AKS.
+This directory contains the Python HTTP application, its container definition,
+the public OpenAPI contract, and Kubernetes deployment manifests.
 
-## Endpoints
+## Contents
 
-- `/` returns application metadata
-- `/api/info` returns structured application and platform metadata
-- `/api/status` returns a simple project status payload
-- `/health` returns a health response for readiness and liveness checks
-- `/metrics` returns Prometheus-compatible metrics
+| Path | Purpose |
+|---|---|
+| `server.py` | Standard-library HTTP server and Prometheus metrics endpoint. |
+| `Dockerfile` | Builds the application image used by CI and AKS. |
+| `.dockerignore` | Excludes local Python artifacts from the image build context. |
+| `openapi.yaml` | OpenAPI 3.0 contract imported by Azure API Management. |
+| `k8s/` | Kustomize-managed Kubernetes resources for AKS. |
 
-`openapi.yaml` defines the public APIM contract for `/health`, `/api/info`, and
-`/api/status`. It intentionally omits `/metrics`, which remains an internal
-Prometheus scrape endpoint.
+## HTTP Endpoints
 
-## Local Run
+| Endpoint | Purpose | APIM exposure |
+|---|---|---|
+| `/` | Application metadata. | Internal application route. |
+| `/api/info` | Application and platform information. | Published. |
+| `/api/status` | Runtime status and component summary. | Published. |
+| `/health` | Startup, readiness, and liveness probe. | Published. |
+| `/metrics` | Prometheus text-format metrics. | Internal only. |
+
+API Management imports `openapi.yaml`, which excludes `/metrics`. Prometheus
+scrapes `/metrics` through the in-cluster Service and `ServiceMonitor`.
+
+## Configuration
+
+The service reads these environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `APP_NAME` | `landing-zone-demo-app` | Application name returned by the API. |
+| `APP_ENV` | `dev` | Environment label. |
+| `APP_VERSION` | `0.1.0` | Application version. |
+| `APP_HOST` | `0.0.0.0` | Listener address. |
+| `APP_PORT` | `8080` | Listener port. |
+
+The Kubernetes ConfigMap supplies the application name, environment, and
+version. The container definition supplies the listener address and port.
+
+## Run Locally
 
 ```powershell
+Set-Location app
 python server.py
 ```
 
-Then open:
+The service is available at `http://localhost:8080`.
 
-- `http://localhost:8080/`
-- `http://localhost:8080/api/info`
-- `http://localhost:8080/api/status`
-- `http://localhost:8080/health`
-- `http://localhost:8080/metrics`
+## Build the Container
 
-## AKS Preparation
-
-The `k8s/` folder now includes:
-
-- `configmap.yaml`
-- `namespace.yaml`
-- `serviceaccount.yaml`
-- `secretproviderclass.yaml`
-- `deployment.yaml`
-- `service.yaml`
-- `ingress.yaml`
-- `kustomization.yaml`
-- `README.md`
-
-The hostless `ingress.yaml` targets the existing ClusterIP Service through the
-managed Application Gateway ingress class. Application Gateway, AGIC, and AKS
-remain disabled and must exist before these manifests are applied.
-
-## Container Build
+From the repository root:
 
 ```powershell
-docker build -t landing-zone-demo-app:latest .
-docker run -p 8080:8080 landing-zone-demo-app:latest
+docker build -t landing-zone-demo-app:local ./app
+docker run --rm -p 8080:8080 landing-zone-demo-app:local
 ```
 
-Containerization is included for future AKS deployment preparation. Building the image locally does not consume Azure credits.
+The publishing workflow builds the same Dockerfile and pushes immutable commit
+SHA tags to GitHub Container Registry.
 
-## Why Python Here
+## Architecture Integration
 
-Python was chosen because this demo app uses only the standard library, which keeps the runtime simple:
-
-- no framework dependency is required
-- no package installation is required
-- the same app can still be containerized and deployed to AKS later
-
-The goal at this stage is to keep the application small and predictable while the infrastructure design is still evolving.
+Requests reach the application through APIM, Application Gateway, AGIC,
+Kubernetes Ingress, and the internal ClusterIP Service. See
+[`k8s/README.md`](k8s/README.md) for manifest configuration and dependencies.

@@ -1,52 +1,54 @@
-# AKS Demo Monitoring Assets
+# Kubernetes Monitoring
 
-These files prepare a temporary, in-cluster monitoring stack; they do not mean
-that monitoring is currently deployed.
+This directory contains configuration for an in-cluster Prometheus and Grafana
+stack based on `prometheus-community/kube-prometheus-stack`.
+
+## Contents
+
+| File | Purpose |
+|---|---|
+| `kube-prometheus-stack-values.yaml` | Helm values for Prometheus, Grafana, kube-state-metrics, and node-exporter. |
+| `servicemonitor.yaml` | Selects the application Service in the `demo` namespace and scrapes `/metrics`. |
+| `grafana-dashboard.json` | Dashboard for application and Kubernetes workload metrics. |
+
+## Data Flow
 
 ```text
-Application /metrics
-  -> demo/landing-zone-demo-app Service (ClusterIP, port http)
+application /metrics
+  -> demo/landing-zone-demo-app Service
   -> monitoring/landing-zone-demo-app ServiceMonitor
   -> Prometheus
   -> Grafana
 ```
 
-The stack uses the open-source
-[`prometheus-community/kube-prometheus-stack`](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
-chart from `https://prometheus-community.github.io/helm-charts`. Prometheus and
-Grafana run inside AKS only during the controlled demo window. Azure Managed
-Grafana, Azure Monitor managed Prometheus, Log Analytics, and Container Insights
-are intentionally excluded to protect the Azure for Students credit.
+The ServiceMonitor is kept outside `app/k8s` because its CRD is installed by
+the monitoring chart. The application Service exposes a stable named `http`
+port and the label selected by the ServiceMonitor.
 
-## Prepared Configuration
+## Configuration
 
-- `kube-prometheus-stack-values.yaml` enables one ephemeral Prometheus replica,
-  Grafana, kube-state-metrics, and a small node-exporter DaemonSet.
-- Alertmanager, persistent volumes, bundled dashboards/rules, and unavailable
-  AKS control-plane scrapes are disabled for this small demonstration.
-- Prometheus retains metrics for six hours and discovers `ServiceMonitor`
-  resources without requiring Helm release labels or the release namespace.
-- Grafana and Prometheus use `ClusterIP`; no ingress or public load balancer is
-  configured.
-- No Grafana password is stored in Git. The chart generates a temporary password
-  in a Kubernetes Secret at installation time.
-- `servicemonitor.yaml` lives in `monitoring` but selects the labeled Service in
-  `demo`. Keeping it outside `app/k8s/kustomization.yaml` avoids applying the
-  custom resource before the chart installs its CRD.
-- `grafana-dashboard.json` is intentionally imported manually, avoiding another
-  operator or a duplicated JSON payload in Helm values.
+The values file configures:
 
-The custom dashboard uses application metrics exposed by `app/server.py`.
-Container CPU and memory come from kubelet/cAdvisor metrics; restart and
-Deployment replica metrics depend on kube-state-metrics. Node exporter supplies
-additional node telemetry for troubleshooting, although the compact dashboard
-does not require it directly.
+- one Prometheus replica with six-hour retention and WAL compression;
+- Grafana with chart-generated credentials;
+- kube-state-metrics and one node-exporter pod per node;
+- `ClusterIP` Services for Prometheus and Grafana;
+- ephemeral storage for Prometheus and Grafana;
+- no Alertmanager, default dashboards, default rules, or AKS control-plane
+  scrapes.
 
-## Future Controlled Install
+Prometheus discovers ServiceMonitors independently of Helm release labels and
+namespaces. No ingress, public load balancer, persistent volume, or managed Azure
+monitoring service is configured.
 
-The following commands are runbook instructions only. Review chart/Kubernetes
-compatibility before the demo; `86.0.1` is intentionally pinned for a
-reproducible install.
+The declared requests are approximately 245 millicores and 580 MiB across the
+main monitoring components and one node-exporter pod. Confirm available cluster
+capacity before installation.
+
+## Install
+
+Review the pinned chart version for compatibility with the target Kubernetes
+version, then run from the repository root:
 
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -56,65 +58,67 @@ helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
   --namespace monitoring \
   --create-namespace \
   --values monitoring/kube-prometheus-stack-values.yaml
+
 kubectl apply -f monitoring/servicemonitor.yaml
 ```
 
-Wait for the stack, then retrieve the Helm-generated Grafana password without
-writing it to a file:
+Wait for Grafana:
 
 ```bash
 kubectl --namespace monitoring rollout status deployment/monitoring-grafana
+```
+
+## Access Grafana
+
+Retrieve the chart-generated password without writing it to a file:
+
+```bash
 kubectl --namespace monitoring get secret monitoring-grafana \
   --output jsonpath='{.data.admin-password}' | base64 --decode
 ```
 
-Use username `admin` and keep Grafana internal by port-forwarding it:
+Forward the internal Grafana Service:
 
 ```bash
 kubectl --namespace monitoring port-forward service/monitoring-grafana 3000:80
 ```
 
-Open `http://localhost:3000`, select **Dashboards > New > Import**, upload
-`monitoring/grafana-dashboard.json`, and select the chart-provisioned Prometheus
-data source when prompted.
+Open `http://localhost:3000`, sign in as `admin`, and import
+`monitoring/grafana-dashboard.json`. Select the Prometheus data source created by
+the chart.
 
-## Verification
+## Verify Metrics
 
-Confirm the `ServiceMonitor` exists and its selector matches the application
-Service:
+Confirm the ServiceMonitor selector matches the application Service:
 
 ```bash
 kubectl --namespace monitoring get servicemonitor landing-zone-demo-app
 kubectl --namespace demo get service landing-zone-demo-app --show-labels
 ```
 
-Forward Prometheus and inspect **Status > Targets** at
-`http://localhost:9090/targets`. The `demo/landing-zone-demo-app` endpoint should
-be `UP`; querying `demo_app_info{namespace="demo"}` should return one series.
+Forward Prometheus and inspect `http://localhost:9090/targets`:
 
 ```bash
-kubectl --namespace monitoring port-forward service/monitoring-kube-prometheus-prometheus 9090:9090
-curl --get --data-urlencode 'query=demo_app_info{namespace="demo"}' \
-  http://localhost:9090/api/v1/query
+kubectl --namespace monitoring port-forward \
+  service/monitoring-kube-prometheus-prometheus 9090:9090
 ```
 
-In Grafana, verify that the dashboard shows app identity, uptime, tracked service
-count, pod CPU/memory/restarts, and desired versus available replicas.
+The `demo/landing-zone-demo-app` target should report `UP`. The dashboard uses:
 
-## Resource and Data-Lifetime Notes
+- `demo_app_info`, `demo_app_uptime_seconds`, and
+  `demo_app_services_total` from the application;
+- container CPU and memory metrics from kubelet/cAdvisor;
+- restart and replica metrics from kube-state-metrics.
 
-The declared requests total roughly 245 millicores and 580 MiB across the main
-Prometheus, Grafana, operator, kube-state-metrics, and one node-exporter pod.
-Actual chart support components add some overhead. Limits are deliberately small
-for a single-node demo, so confirm spare node capacity before installation.
-Prometheus and Grafana use ephemeral storage: pod recreation or uninstall can
-discard metrics, dashboard imports, and Grafana state. That is acceptable for
-the temporary demonstration and avoids Azure Disk charges.
+## Data Persistence
 
-## Future Uninstall
+Prometheus and Grafana use ephemeral storage. Pod replacement or chart removal
+can discard collected metrics, imported dashboards, and Grafana state. Configure
+persistent storage before using this stack for durable monitoring.
 
-Remove the custom resource before removing the chart, then remove the temporary
-namespace after checking that it contains nothing else:
+## Uninstall
+
+Remove the custom resource before uninstalling its CRD provider:
 
 ```bash
 kubectl delete -f monitoring/servicemonitor.yaml
@@ -122,7 +126,5 @@ helm uninstall monitoring --namespace monitoring
 kubectl delete namespace monitoring
 ```
 
-The chart's CRDs can remain after Helm uninstall. Review and remove them only if
-no other monitoring installation uses them. None of the install, apply, delete,
-or uninstall commands in this document were executed while preparing this stage.
-
+Helm does not automatically remove the chart CRDs. Remove them only after
+confirming that no other Prometheus Operator installation uses them.
