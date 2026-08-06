@@ -64,6 +64,6 @@ SHA tags to GitHub Container Registry.
 
 ## Architecture Integration
 
-Requests reach the application through APIM, Application Gateway, AGIC,
-Kubernetes Ingress, and the internal ClusterIP Service. See
+Requests reach the application through Application Gateway WAF_v2, internal
+APIM, and the AKS internal LoadBalancer Service. See
 [`k8s/README.md`](k8s/README.md) for manifest configuration and dependencies.

@@ -12,7 +12,7 @@ changes remain centralized in the root `subnets` variable.
 | `private-endpoints` | `10.10.1.0/24` | `nsg-private-endpoints-alz-dev` | Key Vault and other private endpoints. |
 | `aks` | `10.10.2.0/24` | `nsg-aks-alz-dev` | AKS nodes and workload traffic. |
 | `appgw` | `10.10.3.0/24` | `nsg-appgw-alz-dev` | Application Gateway WAF_v2. |
-| `apim` | `10.10.4.0/24` | `nsg-apim-alz-dev` | Reserved for a future private APIM topology. |
+| `apim` | `10.10.4.0/24` | `nsg-apim-alz-dev` | Dedicated, non-delegated subnet for classic APIM internal VNet mode. |
 
 Each subnet has a dedicated NSG and subnet association.
 
@@ -23,8 +23,17 @@ Each subnet has a dedicated NSG and subnet association.
 | `Internet` | Application Gateway | 443 | TCP | Allow | `internet-to-appgw-https` | 100 inbound |
 | `Internet` | Application Gateway | 80 | TCP | Conditional allow | `internet-to-appgw-http-bootstrap` | 110 inbound |
 | `GatewayManager` | Application Gateway | 65200-65535 | TCP | Conditional allow | `gateway-manager-to-appgw-infrastructure` | 120 inbound |
+| Application Gateway subnet | APIM subnet | 443 | TCP | Conditional allow | `appgw-to-apim-gateway-https` | 100 inbound |
+| `ApiManagement` | APIM subnet | 3443 | TCP | Conditional allow | `api-management-control-plane` | 110 inbound |
+| `AzureLoadBalancer` | APIM subnet | 6390 | TCP | Conditional allow | `azure-load-balancer-to-apim-infrastructure` | 120 inbound |
 | `AzureLoadBalancer` | AKS | 30000-32767 | TCP | Allow | `azure-load-balancer-to-aks-probes` | 100 inbound |
-| Application Gateway | AKS | 80, 443 | TCP | Allow | `appgw-to-aks-web` | 200 inbound |
+| APIM subnet | AKS internal LoadBalancer | 80 | TCP | Conditional allow | `apim-to-aks-backend-http` | 210 inbound |
+| APIM subnet | AKS subnet | 80 | TCP | Conditional allow | `apim-to-aks-backend-http-egress` | 100 outbound |
+| APIM subnet | `Internet` | 80 | TCP | Conditional allow | `apim-to-internet-http` | 110 outbound |
+| APIM subnet | `Storage` | 443 | TCP | Conditional allow | `apim-to-storage-https` | 120 outbound |
+| APIM subnet | `Sql` | 1433 | TCP | Conditional allow | `apim-to-sql` | 130 outbound |
+| APIM subnet | `AzureKeyVault` | 443 | TCP | Conditional allow | `apim-to-key-vault-https` | 140 outbound |
+| APIM subnet | `AzureMonitor` | 1886, 443 | TCP | Conditional allow | `apim-to-azure-monitor` | 150 outbound |
 | AKS | Private endpoints | 443 | TCP | Allow | `aks-to-private-endpoints-https` | 200 inbound |
 | AKS | `Internet` | 443 | TCP | Allow | `aks-to-internet-https` | 200 outbound |
 | Management | AKS | 22, 3389 | TCP | Conditional allow | `management-to-aks-admin` | 300 inbound |
@@ -33,6 +42,8 @@ Each subnet has a dedicated NSG and subnet association.
 Conditional rules are created by root locals:
 
 - `enable_edge_stack` controls the HTTP bootstrap and `GatewayManager` rules;
+- `enable_apim` controls APIM infrastructure, dependency, gateway-to-APIM, and
+  APIM-to-AKS rules;
 - `enable_management_access` controls the internal SSH/RDP rule.
 
 ## Rule Design
@@ -66,8 +77,10 @@ evaluate scoped deny rules or centralized egress controls.
 
 ## Deferred Networking
 
-- The reserved `apim` subnet is unused because the current Developer-tier APIM
-  module uses its public gateway and the Application Gateway public frontend.
+- The repository reserves the APIM subnet for classic Developer-tier APIM
+  internal VNet injection and configures no service delegation. Azure permits
+  other resource types in the subnet, but this design keeps it exclusive for
+  isolation.
 - Key Vault private endpoints and their network policies are not implemented.
 - Prometheus and Grafana run inside AKS and require no separate subnet.
 

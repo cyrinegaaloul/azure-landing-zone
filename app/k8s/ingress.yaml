@@ -1,5 +1,8 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
+# Superseded legacy diagnostic path. This resource is intentionally excluded
+# from kustomization.yaml because the corrected architecture uses an internal
+# LoadBalancer Service as the APIM backend and does not enable AGIC.
 metadata:
   name: landing-zone-demo-app
   namespace: demo
@@ -7,7 +10,6 @@ metadata:
     kubernetes.io/ingress.class: azure/application-gateway # AGIC
     appgw.ingress.kubernetes.io/health-probe-path: /health
 spec:
-  ingressClassName: azure-application-gateway
   rules:
     - http:
         paths:

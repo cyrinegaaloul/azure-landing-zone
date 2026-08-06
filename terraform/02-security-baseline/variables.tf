@@ -40,9 +40,24 @@ variable "environment" {
   }
 }
 
+variable "owner" {
+  description = "Owner identifier used as the globally unique Key Vault name suffix"
+  type        = string
+
+  validation {
+    condition = (
+      can(regex("^[a-z0-9][a-z0-9-]*[a-z0-9]$", var.owner)) &&
+      !strcontains(var.owner, "--") &&
+      length("kv-${var.project_name}-${var.environment}-${var.owner}") <= 24
+    )
+    error_message = "owner must produce a valid Key Vault name of 3 to 24 lowercase alphanumeric or hyphen characters without consecutive hyphens."
+  }
+}
+
 variable "tenant_id" {
   description = "Microsoft Entra tenant ID used by Azure Key Vault"
   type        = string
+  sensitive   = true
 
   validation {
     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.tenant_id))
@@ -62,21 +77,37 @@ variable "enable_key_vault" {
   default     = false
 }
 
+variable "enable_key_vault_purge_protection" {
+  description = "Enables irreversible purge protection on the Key Vault"
+  type        = bool
+  default     = false
+}
+
+variable "key_vault_public_network_access_enabled" {
+  description = "Controls public network connectivity to the Key Vault"
+  type        = bool
+  default     = true
+}
+
 variable "role_assignments" {
   type = map(object({
     scope_key            = string
     role_definition_name = string
     principal_id         = string
-    principal_type       = optional(string)
+    principal_type       = optional(string, "Group")
     description          = optional(string)
   }))
   default = {}
 
   validation {
     condition = alltrue([
-      for assignment in values(var.role_assignments) : contains(keys(var.resource_groups), assignment.scope_key)
+      for assignment in values(var.role_assignments) :
+      contains(keys(var.resource_groups), assignment.scope_key) &&
+      !contains(["Owner", "User Access Administrator"], assignment.role_definition_name) &&
+      contains(["Group", "ServicePrincipal"], assignment.principal_type) &&
+      can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", assignment.principal_id))
     ])
-    error_message = "Each role assignment scope_key must match one of the defined resource_groups."
+    error_message = "Each role assignment must target a defined resource group, avoid Owner and User Access Administrator, use Group or ServicePrincipal, and provide a valid object ID."
   }
 }
 

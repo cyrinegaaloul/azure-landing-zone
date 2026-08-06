@@ -1,121 +1,89 @@
-# Application Gateway WAF_v2 and AGIC
+# Application Gateway WAF_v2 Frontend
 
-The `terraform/03-edge` module provides public layer-7 ingress and WAF
-inspection. The `terraform/04-workloads` module connects AKS to the existing
-gateway through the managed Application Gateway Ingress Controller (AGIC)
-add-on.
+The `terraform/03-edge` module provides the public WAF-enabled frontend for the
+internal API Management gateway.
 
-## Architecture
+## Ownership Change
+
+The legacy demonstration used the AKS-managed Application Gateway Ingress
+Controller add-on to program this gateway directly from Kubernetes Ingress:
 
 ```text
-APIM or Internet
-  -> Standard static public IP
-  -> Application Gateway WAF_v2 and WAF policy
-  -> AGIC-managed Kubernetes Ingress
-  -> ClusterIP Service
-  -> application pods
+APIM -> Application Gateway -> AGIC -> AKS
 ```
 
-AGIC watches Kubernetes Ingress resources and programs Application Gateway
-listeners, backend pools, HTTP settings, probes, and routing rules. It is an AKS
-managed add-on, not a separate gateway or Helm installation.
+That design placed the WAF behind a public APIM endpoint and would create a
+routing loop if APIM were simply moved behind the same gateway.
+
+The corrected design removes AGIC ownership from this Application Gateway:
+
+```text
+Client -> Application Gateway WAF_v2 -> internal APIM -> AKS internal LoadBalancer
+```
+
+Terraform now owns the gateway backend pool, probe, HTTP settings, listener,
+and routing rule. The previous `ignore_changes` list for AGIC-managed child
+collections has been removed.
 
 ## Terraform Resources
 
 | Resource | Name pattern | Purpose |
 |---|---|---|
 | Standard public IP | `pip-appgw-<project>-<environment>` | Public frontend address. |
-| WAF policy | `wafpol-<project>-<environment>` | Microsoft Default Rule Set 2.2. |
-| Application Gateway | `appgw-<project>-<environment>` | Capacity-one WAF_v2 gateway. |
+| WAF policy | `wafpol-<project>-<environment>` | Microsoft Default Rule Set 2.2 in Detection mode. |
+| Application Gateway | `appgw-<project>-<environment>` | Capacity-one WAF_v2 reverse proxy. |
 
-Resources are created only when `enable_edge_stack = true`. The `edge` output
-returns Application Gateway, public IP, and WAF policy details, or `null` when
-disabled.
+## APIM Backend Configuration
 
-Key inputs:
+When APIM is enabled, the gateway uses:
 
-| Input | Default | Description |
-|---|---|---|
-| `enable_edge_stack` | `false` | Enables the public IP, WAF policy, and gateway. |
-| `app_gateway_subnet_id` | Required | Dedicated Application Gateway subnet. |
-| `waf_policy_mode` | `Detection` | `Detection` or `Prevention`. |
-| `health_probe_path` | `/health` | Bootstrap backend probe path. |
-| `application_gateway_capacity` | `1` | Fixed WAF_v2 instance capacity. |
+- APIM private VIPs in the backend pool;
+- HTTPS on backend port 443;
+- the default APIM gateway hostname as Host header and SNI name;
+- certificate-chain and SNI validation;
+- the APIM `/status-0123456789abcdef` health endpoint;
+- a 120-second probe timeout, eight-failure threshold, and 180-second request
+  timeout.
 
-## Bootstrap Configuration
+The public listener remains HTTP port 80 as a temporary demonstration listener.
+WAF Detection mode observes rule matches but does not block them.
 
-Application Gateway requires a complete configuration before AGIC is active.
-Terraform supplies:
+If the edge stack is enabled without APIM, Terraform retains an empty bootstrap
+backend so the gateway resource remains independently plannable. That mode is
+diagnostic only and does not expose the application.
 
-- a public frontend on HTTP port 80;
-- an empty backend pool;
-- an HTTP backend setting on port 80;
-- a `/health` probe;
-- one listener and one Basic routing rule.
+## Networking
 
-The empty pool does not define a synthetic AKS backend. After the application
-Ingress is applied, AGIC discovers the actual pod endpoints.
+The Application Gateway subnet keeps the required rules:
 
-## Ownership and Drift
+- Internet to TCP 80 for the temporary public listener;
+- Internet to TCP 443 for the future HTTPS listener;
+- `GatewayManager` to TCP 65200-65535 with destination `*`.
 
-Terraform owns the gateway resource, WAF SKU and capacity, subnet, public IP,
-tags, and WAF policy. AGIC owns the gateway's Ingress-derived child
-configuration.
+Application traffic leaves the gateway subnet for the APIM subnet on TCP 443.
+The direct Application Gateway-to-AKS NSG rule has been removed from the target
+path.
 
-The scoped lifecycle rule ignores only AGIC-managed collections:
+## AGIC Consequences
 
-- backend pools and HTTP settings;
-- listeners, frontend ports, probes, and routing rules;
-- redirects, rewrite sets, and URL path maps.
+AGIC is no longer enabled on AKS because a controller watching the legacy
+Ingress would overwrite Terraform's APIM backend configuration. The three AGIC
+role assignments are therefore no longer required and are expected to be
+destroyed during migration.
 
-It does not use `ignore_changes = all`. HTTPS changes require an explicit
-ownership review so Terraform and AGIC do not manage the same listener or
-frontend configuration.
-
-## Managed Identity Permissions
-
-When AKS and edge are enabled, AKS creates the AGIC add-on identity. Terraform
-assigns that identity:
-
-| Scope | Role |
-|---|---|
-| Application Gateway | `Network Contributor` |
-| Network resource group | `Reader` |
-| Application Gateway subnet | `Network Contributor` |
-
-No subscription-wide assignment is created.
-
-## Network Requirements
-
-When edge is enabled, the Application Gateway NSG permits:
-
-- `Internet` to TCP 80 for the bootstrap listener;
-- `GatewayManager` to TCP 65200-65535 for platform management;
-- the existing TCP 443 path for future HTTPS;
-- Application Gateway to the AKS subnet on TCP 80 and 443.
-
-Azure's default load-balancer and outbound platform rules remain in place. See
-[`network-security.md`](network-security.md) for the complete traffic matrix.
+The legacy `app/k8s/ingress.yaml` file is retained as a diagnostic reference but
+is excluded from Kustomize. An existing deployed Ingress must be removed by an
+operator after the new path is verified; this repository review does not run
+that deletion.
 
 ## TLS Boundary
 
-The bootstrap listener is HTTP-only. WAF inspection does not provide transport
-encryption. Before production use:
+Application Gateway-to-APIM traffic uses HTTPS. Client-to-Application Gateway
+traffic remains HTTP until an approved public hostname and certificate are
+available. Production hardening requires:
 
-1. provision a certificate through the approved certificate-management path;
-2. add an HTTPS listener and HTTP-to-HTTPS redirect;
-3. review AGIC and Terraform ownership of certificate-related blocks;
-4. remove the public HTTP rule after HTTPS verification.
-
-The repository contains no certificate, private key, password, or Kubernetes
-TLS Secret.
-
-## Deployment Order
-
-1. Enable and apply the edge module while AKS remains disabled.
-2. Enable AKS and edge together so the managed add-on references the existing
-   gateway and Terraform can assign its identity roles.
-3. Configure workload-identity markers and the immutable application image tag.
-4. Apply `app/k8s` through Kustomize.
-5. Verify AGIC reconciliation, gateway backend health, WAF policy association,
-   and application routing.
+1. a public DNS record for the application hostname;
+2. a trusted certificate stored through an approved secret path;
+3. an HTTPS listener and SNI configuration;
+4. HTTP-to-HTTPS redirection;
+5. WAF tuning followed by evaluated Prevention mode.

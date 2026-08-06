@@ -31,16 +31,27 @@ subnets = {
   }
 }
 
-role_assignments         = {}
-resource_group_locks     = {}
-enable_key_vault         = false
+role_assignments = {}
+resource_group_locks = {}
+platform_admin_group_object_id = null
+network_operator_group_object_id = null
+security_reader_group_object_id = null
+enable_resource_group_locks = false
+enable_key_vault = false
+enable_key_vault_purge_protection = false
+key_vault_public_network_access_enabled = true
 # The approved nsg_rules defaults resolve subnet CIDRs from the subnets map.
 enable_management_access = false
 enable_edge_stack        = false
 waf_policy_mode          = "Detection"
+# Protected demonstration profile example:
+# enable_resource_group_locks       = true
+# enable_key_vault_purge_protection = true
+# waf_policy_mode                    = "Prevention"
 enable_apim              = false
 apim_sku_name            = "Developer_1"
 
-enable_aks_demo  = false
-aks_node_count   = 1
-aks_node_vm_size = "Standard_B2s"
+enable_aks_demo = false
+aks_node_count = 1
+aks_node_vm_size = "Standard_B2s_v2"
+aks_internal_load_balancer_ip = "10.10.2.10"

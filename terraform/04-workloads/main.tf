@@ -32,14 +32,6 @@ resource "azurerm_kubernetes_cluster" "aks" {
     secret_rotation_enabled = false
   }
 
-  dynamic "ingress_application_gateway" {
-    for_each = var.enable_edge_stack ? [1] : []
-
-    content {
-      gateway_id = var.application_gateway_id
-    }
-  }
-
   network_profile {
     network_plugin    = "azure"
     load_balancer_sku = "standard"
@@ -70,6 +62,9 @@ resource "azurerm_federated_identity_credential" "app" {
 resource "azurerm_role_assignment" "key_vault_secrets_user" {
   count = var.enable_aks_demo && var.enable_key_vault ? 1 : 0
 
+  # Principal: application user-assigned managed identity federated to the
+  # demo ServiceAccount. Scope/purpose: Key Vault Secrets User on this vault
+  # only, allowing the CSI provider to read secret values for the pod.
   scope                = var.key_vault_id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.app[0].principal_id

@@ -6,11 +6,11 @@ locals {
   gateway_ip_configuration  = "appgw-ipconfig-${local.name_prefix}"
   frontend_ip_configuration = "appgw-public-frontend-${local.name_prefix}"
   frontend_port             = "appgw-http-port-${local.name_prefix}"
-  backend_address_pool      = "appgw-bootstrap-pool-${local.name_prefix}"
-  backend_http_settings     = "appgw-bootstrap-http-${local.name_prefix}"
-  health_probe              = "appgw-bootstrap-health-${local.name_prefix}"
-  http_listener             = "appgw-bootstrap-http-listener-${local.name_prefix}"
-  request_routing_rule      = "appgw-bootstrap-http-rule-${local.name_prefix}"
+  backend_address_pool      = "appgw-apim-pool-${local.name_prefix}"
+  backend_http_settings     = "appgw-apim-https-${local.name_prefix}"
+  health_probe              = "appgw-apim-health-${local.name_prefix}"
+  http_listener             = "appgw-public-http-listener-${local.name_prefix}"
+  request_routing_rule      = "appgw-to-apim-http-rule-${local.name_prefix}"
 }
 
 resource "azurerm_public_ip" "application_gateway" {
@@ -71,34 +71,44 @@ resource "azurerm_application_gateway" "main" {
     public_ip_address_id = azurerm_public_ip.application_gateway[0].id
   }
 
-  # Bootstrap-only HTTP configuration. AGIC replaces and manages these sets
-  # after the Kubernetes Ingress is created.
+  # The public HTTP listener remains temporary until a reviewed certificate is
+  # supplied. Terraform owns the complete gateway configuration; AGIC is not
+  # used because this gateway fronts internal API Management rather than AKS.
   frontend_port {
     name = local.frontend_port
     port = 80
   }
 
   backend_address_pool {
-    name = local.backend_address_pool
+    name         = local.backend_address_pool
+    ip_addresses = var.apim_backend_ip_addresses
   }
 
   probe {
     name                = local.health_probe
-    protocol            = "Http"
-    path                = var.health_probe_path
-    host                = "127.0.0.1"
-    interval            = 30
-    timeout             = 10
-    unhealthy_threshold = 3
+    protocol            = var.apim_backend_enabled ? "Https" : "Http"
+    path                = var.apim_backend_enabled ? "/status-0123456789abcdef" : var.health_probe_path
+    host                = var.apim_backend_enabled ? var.apim_gateway_hostname : "127.0.0.1"
+    interval            = var.apim_backend_enabled ? 120 : 30
+    timeout             = var.apim_backend_enabled ? 120 : 10
+    unhealthy_threshold = var.apim_backend_enabled ? 8 : 3
+
+    match {
+      status_code = ["200-399"]
+    }
   }
 
   backend_http_settings {
-    name                  = local.backend_http_settings
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 30
-    probe_name            = local.health_probe
+    name                                 = local.backend_http_settings
+    cookie_based_affinity                = "Disabled"
+    port                                 = var.apim_backend_enabled ? 443 : 80
+    protocol                             = var.apim_backend_enabled ? "Https" : "Http"
+    request_timeout                      = var.apim_backend_enabled ? 180 : 30
+    probe_name                           = local.health_probe
+    host_name                            = var.apim_backend_enabled ? var.apim_gateway_hostname : null
+    sni_name                             = var.apim_backend_enabled ? var.apim_gateway_hostname : null
+    sni_validation_enabled               = var.apim_backend_enabled
+    certificate_chain_validation_enabled = var.apim_backend_enabled
   }
 
   http_listener {
@@ -117,18 +127,4 @@ resource "azurerm_application_gateway" "main" {
     backend_http_settings_name = local.backend_http_settings
   }
 
-  lifecycle {
-    # AGIC owns these child configurations after Kubernetes Ingress is applied.
-    ignore_changes = [
-      backend_address_pool,
-      backend_http_settings,
-      frontend_port,
-      http_listener,
-      probe,
-      redirect_configuration,
-      request_routing_rule,
-      rewrite_rule_set,
-      url_path_map
-    ]
-  }
 }

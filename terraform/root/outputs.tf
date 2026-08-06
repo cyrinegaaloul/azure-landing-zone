@@ -20,6 +20,7 @@ output "networking" {
 
 output "security_baseline" {
   description = "Security baseline module outputs"
+  sensitive   = true
   value = {
     role_assignments     = module.security_baseline.role_assignments
     resource_group_locks = module.security_baseline.resource_group_locks
@@ -39,10 +40,11 @@ output "apim" {
 
 output "workloads" {
   description = "AKS workload module outputs"
+  sensitive   = true
   value = {
     aks_cluster                  = module.workloads.aks_cluster
     workload_identity            = module.workloads.workload_identity
+    application_backend_url      = module.workloads.application_backend_url
     key_vault_role_assignment_id = module.workloads.key_vault_role_assignment_id
-    agic_identity                = module.workloads.agic_identity
   }
 }

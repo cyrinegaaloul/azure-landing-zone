@@ -68,3 +68,30 @@ variable "application_gateway_capacity" {
   }
 }
 
+variable "apim_backend_enabled" {
+  description = "Configures the gateway to forward to internal API Management instead of an empty bootstrap pool."
+  type        = bool
+  default     = false
+}
+
+variable "apim_backend_ip_addresses" {
+  description = "Private virtual IP addresses exported by internal API Management."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = !var.apim_backend_enabled || length(var.apim_backend_ip_addresses) > 0
+    error_message = "apim_backend_ip_addresses must contain at least one address when the APIM backend is enabled."
+  }
+}
+
+variable "apim_gateway_hostname" {
+  description = "API Management gateway hostname sent as the backend Host header and TLS SNI name."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = !var.apim_backend_enabled || try(endswith(var.apim_gateway_hostname, ".azure-api.net"), false)
+    error_message = "apim_gateway_hostname must be an azure-api.net gateway hostname when the APIM backend is enabled."
+  }
+}

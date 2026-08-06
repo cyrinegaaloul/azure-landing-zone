@@ -23,13 +23,14 @@ on:
         default: false
         type: boolean
       enable_apim:
-        description: "Enable billable Developer-tier API Management (requires edge)"
+        description: "Enable internal Developer-tier API Management (requires edge and AKS)"
         required: true
         default: false
         type: boolean
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   terraform-demo:
@@ -52,7 +53,8 @@ jobs:
       TF_VAR_apim_sku_name: Developer_1
       TF_VAR_enable_aks_demo: ${{ inputs.enable_aks }}
       TF_VAR_aks_node_count: 1
-      TF_VAR_aks_node_vm_size: Standard_B2s
+      TF_VAR_aks_node_vm_size: Standard_B2s_v2
+      TF_VAR_aks_internal_load_balancer_ip: 10.10.2.10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -65,9 +67,9 @@ jobs:
       - name: Log in to Azure
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-        # Future hardening: replace this credentials JSON with GitHub OIDC
-        # federation after configuring the required Azure identity resources.
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Terraform init
         run: terraform -chdir=terraform/root init

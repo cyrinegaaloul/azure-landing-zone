@@ -68,8 +68,8 @@ secret or another supported GHCR authentication method in AKS.
 |---|---|---|
 | `action` | `plan` | Terraform action: `plan`, `apply`, or `destroy`. |
 | `enable_aks` | `false` | Enables conditional AKS resources. |
-| `enable_edge` | `false` | Enables Application Gateway WAF_v2 and AGIC integration. |
-| `enable_apim` | `false` | Enables Developer-tier APIM; requires `enable_edge=true`. |
+| `enable_edge` | `false` | Enables the Application Gateway WAF_v2 public frontend. |
+| `enable_apim` | `false` | Enables internal Developer-tier APIM; requires both `enable_edge=true` and `enable_aks=true`. |
 
 The workflow passes configuration through `TF_VAR_` environment variables and
 does not depend on a local `terraform.tfvars` file.
@@ -78,10 +78,10 @@ Required repository or environment secrets:
 
 | Secret | Purpose |
 |---|---|
-| `AZURE_CREDENTIALS` | Credentials consumed by `azure/login`. |
+| `AZURE_CLIENT_ID` | Client ID of the Entra application or managed identity trusted through GitHub OIDC. |
 | `AZURE_SUBSCRIPTION_ID` | AzureRM provider subscription. |
 | `AZURE_TENANT_ID` | Tenant-scoped resources such as Key Vault. |
 
-Protect the `demo` GitHub environment with required reviewers. Replacing the
-credentials JSON with GitHub OIDC federation is a recommended identity
-hardening step after the corresponding Azure identity is configured.
+Protect the `demo` GitHub environment with required reviewers. The workflow
+uses GitHub OIDC and requires a federated identity credential whose subject
+matches that environment; it does not use a client secret or credentials JSON.

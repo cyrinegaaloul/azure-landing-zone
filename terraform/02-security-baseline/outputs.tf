@@ -1,4 +1,6 @@
 output "role_assignments" {
+  description = "Role assignments, including principal object IDs"
+  sensitive   = true
   value = {
     for assignment_name, assignment in azurerm_role_assignment.landing_zone : assignment_name => {
       id                   = assignment.id

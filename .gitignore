@@ -16,6 +16,20 @@ crash.*.log
 # Azure CLI / credentials
 .azure/
 
+# Kubernetes credentials
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+
+# Local secrets and certificate private keys
+.env
+.env.*
+*.secret
+*.secrets
+*.key
+*.pem
+*.pfx
+
 # VS Code
 .vscode/
 

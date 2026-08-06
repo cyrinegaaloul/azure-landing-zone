@@ -1,6 +1,7 @@
 variable "subscription_id" {
   description = "Azure subscription ID used by the root provider"
   type        = string
+  sensitive   = true
 
   validation {
     condition     = can(regex("^[0-9a-fA-F-]{36}$", var.subscription_id))
@@ -11,6 +12,7 @@ variable "subscription_id" {
 variable "tenant_id" {
   description = "Microsoft Entra tenant ID used by tenant-scoped Azure resources"
   type        = string
+  sensitive   = true
 
   validation {
     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.tenant_id))
@@ -63,13 +65,17 @@ variable "environment" {
 }
 
 variable "owner" {
-  description = "Person or team responsible for the deployed resources"
+  description = "Lowercase owner identifier used in tags and globally unique resource names"
   type        = string
   default     = "cyrine"
 
   validation {
-    condition     = length(trimspace(var.owner)) > 0
-    error_message = "owner must not be empty."
+    condition = (
+      can(regex("^[a-z0-9][a-z0-9-]*[a-z0-9]$", var.owner)) &&
+      !strcontains(var.owner, "--") &&
+      length("kv-${var.project_name}-${var.environment}-${var.owner}") <= 24
+    )
+    error_message = "owner must contain at least two lowercase letters, numbers, or single hyphens, must start and end with a letter or number, and must keep the generated Key Vault name within 24 characters."
   }
 }
 
@@ -146,15 +152,6 @@ variable "nsg_rules" {
       destination_subnet_key  = "aks"
       description             = "Future AKS load-balancer health probes over the default NodePort range"
     }
-    appgw-to-aks-web = {
-      nsg_key                 = "aks"
-      priority                = 200
-      direction               = "Inbound"
-      destination_port_ranges = ["80", "443"]
-      source_subnet_key       = "appgw"
-      destination_subnet_key  = "aks"
-      description             = "Future Application Gateway forwarding to AKS web endpoints"
-    }
     aks-to-private-endpoints-https = {
       nsg_key                 = "private-endpoints"
       priority                = 200
@@ -195,7 +192,7 @@ variable "enable_management_access" {
 }
 
 variable "enable_edge_stack" {
-  description = "Controls the billable Application Gateway WAF_v2 edge stack and AGIC integration"
+  description = "Controls the billable Application Gateway WAF_v2 public frontend"
   type        = bool
   default     = false
 }
@@ -217,8 +214,8 @@ variable "enable_apim" {
   default     = false
 
   validation {
-    condition     = !var.enable_apim || var.enable_edge_stack
-    error_message = "enable_apim requires enable_edge_stack so APIM has a real Application Gateway backend."
+    condition     = !var.enable_apim || (var.enable_edge_stack && var.enable_aks_demo)
+    error_message = "enable_apim requires enable_edge_stack and enable_aks_demo for the Application Gateway -> internal APIM -> AKS path."
   }
 }
 
@@ -239,10 +236,56 @@ variable "role_assignments" {
     scope_key            = string
     role_definition_name = string
     principal_id         = string
-    principal_type       = optional(string)
+    principal_type       = optional(string, "Group")
     description          = optional(string)
   }))
   default = {}
+
+  validation {
+    condition = alltrue([
+      for assignment in values(var.role_assignments) :
+      !contains(["Owner", "User Access Administrator"], assignment.role_definition_name) &&
+      contains(["Group", "ServicePrincipal"], assignment.principal_type) &&
+      can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", assignment.principal_id))
+    ])
+    error_message = "role_assignments cannot grant Owner or User Access Administrator, must target a Group or ServicePrincipal, and must use a valid object ID."
+  }
+}
+
+variable "platform_admin_group_object_id" {
+  description = "Optional Microsoft Entra group object ID granted Contributor on the foundation resource group"
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.platform_admin_group_object_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.platform_admin_group_object_id))
+    error_message = "platform_admin_group_object_id must be null or a valid Microsoft Entra object ID."
+  }
+}
+
+variable "network_operator_group_object_id" {
+  description = "Optional Microsoft Entra group object ID granted Network Contributor on the network resource group"
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.network_operator_group_object_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.network_operator_group_object_id))
+    error_message = "network_operator_group_object_id must be null or a valid Microsoft Entra object ID."
+  }
+}
+
+variable "security_reader_group_object_id" {
+  description = "Optional Microsoft Entra group object ID granted Security Reader on the security resource group"
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.security_reader_group_object_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.security_reader_group_object_id))
+    error_message = "security_reader_group_object_id must be null or a valid Microsoft Entra object ID."
+  }
 }
 
 variable "resource_group_locks" {
@@ -254,10 +297,28 @@ variable "resource_group_locks" {
   default = {}
 }
 
+variable "enable_resource_group_locks" {
+  description = "Enables CanNotDelete locks on the network and security resource groups"
+  type        = bool
+  default     = false
+}
+
 variable "enable_key_vault" {
   description = "Controls whether the landing zone Key Vault is enabled"
   type        = bool
   default     = false
+}
+
+variable "enable_key_vault_purge_protection" {
+  description = "Enables irreversible Key Vault purge protection for protected environments"
+  type        = bool
+  default     = false
+}
+
+variable "key_vault_public_network_access_enabled" {
+  description = "Allows public network connectivity to Key Vault; disable only after private networking is implemented"
+  type        = bool
+  default     = true
 }
 
 variable "enable_aks_demo" {
@@ -275,5 +336,16 @@ variable "aks_node_count" {
 variable "aks_node_vm_size" {
   description = "AKS node VM size"
   type        = string
-  default     = "Standard_B2s"
+  default     = "Standard_B2s_v2"
+}
+
+variable "aks_internal_load_balancer_ip" {
+  description = "Static private IP reserved in the AKS subnet for the application's internal Kubernetes LoadBalancer"
+  type        = string
+  default     = "10.10.2.10"
+
+  validation {
+    condition     = try(can(cidrhost("${var.aks_internal_load_balancer_ip}/32", 0)) && cidrcontains(var.subnets["aks"].address_prefixes[0], var.aks_internal_load_balancer_ip), false)
+    error_message = "aks_internal_load_balancer_ip must be a valid IPv4 address inside the configured AKS subnet. Confirm that Azure has not already allocated it before deployment."
+  }
 }

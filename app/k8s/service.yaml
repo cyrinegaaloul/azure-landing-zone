@@ -5,12 +5,15 @@ metadata:
   namespace: demo
   labels:
     app: landing-zone-demo-app
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    service.beta.kubernetes.io/azure-load-balancer-ipv4: "10.10.2.10"
 spec:
   selector:
     app: landing-zone-demo-app
   ports:
-    - name: http # Referenced by Prometheus and Ingress
+    - name: http # Referenced by Prometheus and the retained legacy Ingress manifest
       protocol: TCP
       port: 80 # Service port
       targetPort: 8080 # Pod port
-  type: ClusterIP
+  type: LoadBalancer

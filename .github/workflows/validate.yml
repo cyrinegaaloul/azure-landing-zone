@@ -27,7 +27,7 @@ jobs:
 
       - name: Terraform init
         working-directory: terraform/root
-        run: terraform init -backend=false
+        run: terraform init -backend=false -input=false
 
       - name: Terraform validate
         working-directory: terraform/root
@@ -118,10 +118,10 @@ jobs:
             "$RUNNER_TEMP/rendered-manifests.yaml"
 
       - name: Validate repository YAML syntax
-        run: >-
-          ruby -rpsych -e
-          'ARGV.each { |path| Psych.parse_stream(File.read(path)); puts "Valid YAML: #{path}" }'
-          app/openapi.yaml monitoring/*.yaml
+        run: |
+          git ls-files -z '*.yaml' '*.yml' |
+            xargs -0 ruby -rpsych -e \
+              'ARGV.each { |path| Psych.parse_stream(File.read(path)); puts "Valid YAML: #{path}" }'
 
       - name: Validate ServiceMonitor manifest
         run: >-
