@@ -3,4 +3,7 @@ kind: Namespace
 metadata:
   name: demo
   labels:
-    app.kubernetes.io/part-of: landing-zone-demo # Groups the application resources
+    app.kubernetes.io/part-of: landing-zone-demo
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

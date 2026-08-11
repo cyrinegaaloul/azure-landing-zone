@@ -7,3 +7,4 @@ data:
   APP_NAME: landing-zone-demo-app
   APP_ENV: demo
   APP_VERSION: "0.1.0"
+  APP_MOUNTED_FILE_PATH: /mnt/secrets-store/demo-secret

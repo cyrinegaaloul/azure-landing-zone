@@ -1,231 +1,175 @@
-# Azure Landing Zone with AKS
+# Azure Landing Zone Demo
 
-This repository implements a modular Azure landing zone with conditional AKS,
-Application Gateway WAF_v2, internal-mode Azure API Management, Azure Key Vault
-integration, an example application, in-cluster monitoring, and DevSecOps
-validation.
-
-Terraform configuration is declarative and does not deploy resources until an
-operator runs an apply operation.
-
-## Architecture
+This repository implements a cost-aware Azure landing-zone prototype and a
+containerized demonstration workload. The deployed application path is:
 
 ```text
-Internet
+Internet (HTTP development endpoint)
   -> Application Gateway WAF_v2
-  -> internal API Management gateway
-  -> internal AKS LoadBalancer Service
-  -> application pods
-
-application pods
-  -> Microsoft Entra Workload Identity
-  -> Key Vault Secrets Store CSI provider
-  -> Azure Key Vault
-
-application /metrics
-  -> ServiceMonitor
-  -> Prometheus
-  -> Grafana
+  -> API Management Developer tier (internal VNet mode, HTTPS)
+  -> AKS internal LoadBalancer
+  -> non-root application pod
+  -> Workload Identity + Secrets Store CSI
+  -> private Azure Key Vault endpoint
 ```
 
-The original demo routed APIM to the Application Gateway public IP and used
-AGIC to route the gateway to AKS. That path is superseded. APIM now requires
-both AKS and the edge stack: the application has a separate internal
-LoadBalancer backend, APIM is injected into its dedicated subnet, and
-Application Gateway is the only public application entry point.
+The public listener intentionally remains HTTP because the project has no
+owned public domain or trusted certificate. Application Gateway validates TLS
+to the internal APIM gateway. Client-facing HTTPS is production hardening, not
+a simulated feature.
 
-```mermaid
-flowchart LR
-  Client[Client] -->|HTTP 80 demo listener| AppGW[Application Gateway WAF_v2]
-  AppGW -->|HTTPS 443, APIM Host/SNI| APIM[API Management internal VNet]
-  APIM -->|HTTP 80| ILB[AKS internal LoadBalancer]
-  ILB -->|TCP 8080| Pod[Application Pod]
-```
-
-## Repository Layout
+## Repository layout
 
 | Path | Purpose |
 |---|---|
-| `terraform/` | Reusable infrastructure modules and the root composition. |
-| `app/` | Python application, Dockerfile, OpenAPI contract, and Kubernetes manifests. |
-| `monitoring/` | Prometheus, Grafana, ServiceMonitor, and dashboard configuration. |
-| `docs/` | Detailed edge, APIM, and network-security design documents. |
-| `pipelines/` | GitHub Actions workflow reference. |
-| `.github/workflows/` | Validation, image publication, and manual Terraform workflows. |
+| `terraform/bootstrap-state/` | One-time, separate Azure Blob backend bootstrap. |
+| `terraform/00-foundation/` | Resource groups, common naming, and tags. |
+| `terraform/01-networking/` | VNet, subnets, NSGs, and rule associations. |
+| `terraform/02-security-baseline/` | Key Vault, private endpoint/DNS, RBAC, and optional locks. |
+| `terraform/03-edge/` | Application Gateway WAF_v2 and public IP. |
+| `terraform/04-workloads/` | AKS, Workload Identity, federation, and Key Vault RBAC. |
+| `terraform/05-apim/` | Internal APIM instance and imported demo API. |
+| `terraform/root/` | Composition, profiles, cross-module traffic rules, and outputs. |
+| `app/` | Python service, Dockerfile, OpenAPI contract, and Kubernetes base. |
+| `scripts/` | Deployment-time Kubernetes rendering. |
+| `monitoring/` | kube-prometheus-stack values, ServiceMonitor, and Grafana dashboard. |
+| `.github/workflows/` | Gated CI/image publication and controlled deployment. |
+| `docs/` | Networking, security, edge, APIM, and state details. |
 
-## Terraform Modules
+## Functional profiles
 
-| Module | Purpose | Primary resources |
-|---|---|---|
-| `00-foundation` | Naming, tags, and resource-group structure. | Resource groups |
-| `01-networking` | Virtual network, subnets, NSGs, and data-driven NSG rules. | VNet, subnets, NSGs |
-| `02-security-baseline` | Resource-group RBAC, management locks, and optional Key Vault. | Role assignments, locks, Key Vault |
-| `03-edge` | Conditional public WAF frontend for internal APIM. | Public IP, WAF policy, Application Gateway |
-| `04-workloads` | Conditional AKS, workload identity, Key Vault access, and internal backend contract. | AKS, managed identity, federated credential, role assignment |
-| `05-apim` | Internal VNet API gateway, private DNS, and OpenAPI publication. | APIM service, private DNS, API, API policy |
-| `root` | Composes modules and connects their inputs and outputs. | Environment-level orchestration |
+Terraform rejects combinations that would create an unusable partial path.
 
-The root module is the supported entry point. Child modules contain their own
-provider constraints but receive environment configuration from root.
+| Profile | Key Vault | Private endpoint | AKS/APIM/App Gateway | Key Vault public access | Locks/WAF |
+|---|---:|---:|---:|---:|---|
+| `core` | Off | Off | Off | N/A | Off / Detection |
+| `key-vault-bootstrap` | On | Off | Off | On | Off / Detection |
+| `full` | On | On | On | Off | Off / Detection |
+| `secure` | On | On | On | Off | `CanNotDelete` / Prevention |
 
-## Configuration
+The bootstrap profile exists only to create `demo-secret` before private-only
+Key Vault networking is enabled. It does not deploy expensive application
+components. The secure profile leaves Key Vault purge protection disabled so
+the internship environment remains intentionally destroyable.
 
-The root directory uses two local variable profiles:
+## Prerequisites
 
-| File | Purpose | Loading behavior |
-|---|---|---|
-| `terraform.tfvars` | Normal deployment profile with Key Vault, AKS, edge, and APIM enabled. | Loaded automatically by Terraform. |
-| `terraform.safe.tfvars` | Minimal profile with optional deployment features disabled. | Loaded only when passed with `-var-file`. |
+- Terraform 1.14 or later
+- Azure CLI and an Azure subscription
+- Docker for local image validation
+- `kubectl`, `kubelogin`, and Helm only for a later deployed environment
+- A GitHub OIDC application/service principal and GHCR access for automation
 
-Both files contain environment-specific Azure identifiers and are ignored by
-Git. `terraform.tfvars.example` remains the version-controlled template for
-creating profiles in another environment.
+No paid domain, external certificate, monitoring SaaS, Terraform Cloud, or paid
+GitHub product is required.
 
-Core inputs:
+## Terraform state
 
-| Input | Default | Description |
-|---|---|---|
-| `subscription_id` | Required | Azure subscription used by the provider. |
-| `tenant_id` | Required | Microsoft Entra tenant for Key Vault and identity resources. |
-| `location` | `francecentral` | Deployment region. |
-| `project_name` | `alz` | Short resource-name component. |
-| `environment` | `dev` | Environment name: `dev`, `test`, or `prod`. |
-| `owner` | `cyrine` | Tag value and suffix for globally unique Key Vault and APIM names. |
-| `aks_internal_load_balancer_ip` | `10.10.2.10` | Static AKS-subnet address shared by the Kubernetes Service and APIM backend configuration. |
-| `vnet_address_space` | `10.10.0.0/16` | Landing-zone VNet CIDR. |
-| `subnets` | See example file | Logical subnet definitions. |
-
-Conditional features:
-
-| Input | Default | Effect when enabled |
-|---|---|---|
-| `enable_key_vault` | `false` | Creates the landing-zone Key Vault. |
-| `enable_aks_demo` | `false` | Creates AKS and the application workload identity. |
-| `enable_edge_stack` | `false` | Creates the Application Gateway WAF_v2 public frontend. |
-| `enable_apim` | `false` | Creates internal Developer-tier APIM; requires the edge stack and AKS. |
-| `enable_management_access` | `false` | Adds the internal management-to-AKS administration rule. |
-| `enable_resource_group_locks` | `false` | Adds CanNotDelete locks to the network and security resource groups. |
-| `enable_key_vault_purge_protection` | `false` | Enables irreversible Key Vault purge protection. |
-| `key_vault_public_network_access_enabled` | `true` | Keeps Key Vault reachable until private networking is implemented. |
-
-Additional inputs configure NSG rules, RBAC assignments, management locks, WAF
-mode, APIM SKU, and AKS node sizing. See
-[`terraform/root/variables.tf`](terraform/root/variables.tf) and
-[`terraform/root/terraform.tfvars.example`](terraform/root/terraform.tfvars.example).
-
-## Terraform Outputs
-
-The root module exposes aggregate objects for:
-
-- `foundation`: resource groups, location, naming prefix, and common tags;
-- `networking`: VNet, subnets, NSGs, and NSG rules;
-- `security_baseline`: RBAC assignments, locks, and optional Key Vault;
-- `edge`: Application Gateway, public IP, and WAF policy when enabled;
-- `workloads`: AKS, workload identity, Key Vault role assignment, and the
-  internal application backend URL when enabled;
-- `apim`: APIM service, private IPs, internal gateway hostname, API, and AKS
-  backend when enabled.
-
-Conditional outputs return `null` when their corresponding feature is disabled.
-
-## Local Terraform Workflow
-
-Initialize and validate from the repository root:
+The root uses the `azurerm` backend. Azure Blob leases provide state locking;
+Microsoft Entra authorization avoids storage account keys. Bootstrap the small
+state stack once, then initialize local work with a private backend file:
 
 ```powershell
-terraform -chdir=terraform/root init
-terraform fmt -check -recursive
-terraform -chdir=terraform/root validate
+az login
+terraform -chdir=terraform/bootstrap-state init
+terraform -chdir=terraform/bootstrap-state plan -out=tfplan
+# Apply only when you intentionally create the backend:
+terraform -chdir=terraform/bootstrap-state apply tfplan
+
+Copy-Item terraform/root/backend.dev.hcl.example terraform/root/backend.dev.hcl
+terraform -chdir=terraform/root init -migrate-state -backend-config=backend.dev.hcl
 ```
 
-Create and review the normal deployment plan. Terraform automatically loads
-`terraform/root/terraform.tfvars`:
+`backend.dev.hcl` is ignored. It contains names, not credentials. Local users
+and the GitHub OIDC principal need `Storage Blob Data Contributor` on the state
+storage account. See [Terraform state](docs/terraform-state.md).
+
+Use `-migrate-state` once so the existing local state is copied into Azure
+Blob Storage instead of starting with an empty state. Confirm the migrated
+state before archiving the local state files. Later backend initialization may
+use `-reconfigure`.
+
+## Planning and deployment
+
+The ignored `terraform.tfvars` contains the active local full-demo values. The
+tracked `terraform.tfvars.example` is the safe template and documents the
+bootstrap, full, and secure option sets. After backend initialization:
 
 ```powershell
+# Full demonstration
 terraform -chdir=terraform/root plan -out=tfplan
+
+# Cost-safe/core configuration
+terraform -chdir=terraform/root plan `
+  -var="enable_key_vault=false" `
+  -var="enable_key_vault_private_endpoint=false" `
+  -var="enable_aks_demo=false" `
+  -var="enable_edge_stack=false" `
+  -var="enable_apim=false"
 ```
 
-Apply the reviewed normal deployment plan:
+The recommended deployment path is the manual `controlled-demo-deployment`
+workflow. It creates a saved plan, uploads it for review, and requires the
+`demo-apply` environment before applying the exact plan. Full deployments then:
 
-```powershell
-terraform -chdir=terraform/root apply tfplan
+1. resolve the CI-published SHA image to its immutable digest;
+2. obtain Terraform outputs without committing GUIDs or generated addresses;
+3. render Kubernetes configuration and reject remaining placeholders;
+4. install the pinned monitoring chart and provision its dashboard;
+5. deploy the application, wait for rollout, and smoke-test through App Gateway.
+
+Create `demo-secret` during the Key Vault bootstrap stage. Never commit its
+value. Detailed prerequisites are in [pipeline documentation](pipelines/README.md).
+
+## Resource locks and destroy
+
+To demonstrate deletion protection safely:
+
+```text
+apply secure -> demonstrate protection -> apply full -> destroy full
 ```
 
-Create a safe/minimal plan by selecting the alternate profile explicitly:
+Do not destroy with the secure profile. The workflow rejects that operation.
+The root state backend is separate and is not destroyed with the landing zone.
 
-```powershell
-terraform -chdir=terraform/root plan -var-file=terraform.safe.tfvars
-```
+## Validation and image publication
 
-Destroy a safe/minimal deployment only when that profile was used to create the
-current state:
+`validate-build-publish` runs on pull requests and pushes to `main`:
 
-```powershell
-terraform -chdir=terraform/root destroy -var-file=terraform.safe.tfvars
-```
+- Terraform format, validation, and Trivy IaC scanning;
+- Python syntax and unit tests;
+- Kustomize rendering, kubeconform, and Trivy Kubernetes scanning;
+- YAML and JSON parsing;
+- one Docker build and two-stage image vulnerability reporting/gating;
+- CycloneDX SBOM generation.
 
-Destroy the normal deployment with the automatically loaded normal profile:
+Pull requests never publish. On `main`, the exact scanned image is pushed to
+GHCR using only the Git commit SHA tag. All HIGH/CRITICAL findings are reported;
+fixable HIGH/CRITICAL image vulnerabilities fail the pipeline. Unfixed findings
+remain visible but do not block this development image.
 
-```powershell
-terraform -chdir=terraform/root destroy
-```
+## Cost impact
 
-Terraform state may contain infrastructure identifiers. Store state in an
-approved backend and do not commit local state or variable files.
+| Resource | Purpose | Cost category | Optional |
+|---|---|---|---|
+| Backend resource group | Isolate state lifecycle | Negligible | Required for remote state |
+| Standard LRS storage account | Versioned, locked Terraform state | Low/negligible | Required for remote state |
+| Private blob container | Store environment state | No separate charge | Required for remote state |
+| Backend RBAC assignments | Keyless local/CI access | No charge | Assign only required principals |
+| Key Vault private endpoint | Private AKS-to-vault data path | Low recurring | Disabled in core/bootstrap |
+| Private DNS zone | Resolve the vault hostname privately | Low/negligible | Disabled with the endpoint |
+| VNet DNS link/zone group | Integrate DNS and endpoint | No or negligible separate charge | Disabled with the endpoint |
 
-## Application Deployment
+Application Gateway WAF_v2, APIM Developer, AKS, and the internal load balancer
+remain the dominant costs. The `core` and bootstrap profiles avoid them.
 
-After Terraform has created the required AKS, identity, Key Vault, and edge
-resources:
+## Development limitations
 
-1. Confirm that `aks_internal_load_balancer_ip` is unused in the AKS subnet and
-   matches the Service annotation under `app/k8s`.
-2. Replace the managed-identity client ID and tenant ID markers locally, and
-   verify the Key Vault name. Do not commit the populated manifests.
-3. Add the required secret value directly to Key Vault.
-4. Replace the application image's `latest` tag with an immutable GHCR SHA tag.
-5. Render and review the Kustomize output.
-6. Apply the manifests and verify the internal LoadBalancer address and
-   Deployment rollout before testing APIM and Application Gateway.
-
-See [`app/k8s/README.md`](app/k8s/README.md) for exact dependencies and commands.
-
-## Security Controls
-
-- Data-driven NSG rules with explicit ports, priorities, subnet keys, and Azure
-  service tags.
-- Application Gateway WAF_v2 with Microsoft Default Rule Set 2.2 as the public
-  frontend for internal API Management.
-- Microsoft Entra Workload Identity without stored Azure credentials in pods.
-- Key Vault RBAC with a scoped `Key Vault Secrets User` assignment.
-- Secrets Store CSI mounting without Kubernetes Secret synchronization.
-- Non-root containers, dropped Linux capabilities, read-only root filesystem,
-  seccomp, resource limits, and health probes.
-- Internal-mode APIM with exact-hostname private DNS, rate limiting, and
-  correlation-ID propagation.
-- CI security gates for Terraform, Kubernetes, monitoring, and container images.
-
-Detailed networking and ownership boundaries are documented in:
-
-- [`docs/security.md`](docs/security.md)
-- [`docs/network-security.md`](docs/network-security.md)
-- [`docs/edge.md`](docs/edge.md)
-- [`docs/apim.md`](docs/apim.md)
-
-## CI/CD
-
-| Workflow | Purpose |
-|---|---|
-| `validate.yml` | Terraform, source, image, Kubernetes, monitoring, and security validation. |
-| `build-image.yml` | Publishes SHA-tagged application images to GHCR. |
-| `demo-deploy.yml` | Runs an operator-selected Terraform plan, apply, or destroy action. |
-
-The validation workflow does not authenticate to Azure or contact a Kubernetes
-cluster. See [`pipelines/README.md`](pipelines/README.md) for triggers, inputs,
-permissions, security gates, and required secrets.
-
-## Monitoring
-
-The monitoring assets install Prometheus and Grafana inside AKS and keep both
-Services internal. See [`monitoring/README.md`](monitoring/README.md) for
-installation, verification, access, persistence, and removal procedures.
+- The public frontend is HTTP until an owned domain and trusted certificate are
+  available.
+- AKS uses a public API endpoint; optional authorized CIDRs can reduce exposure.
+- The single small node, ephemeral Prometheus data, disabled Alertmanager, and
+  APIM Developer tier are deliberate non-production choices.
+- GitHub-hosted runners require the state storage data endpoint to be publicly
+  reachable; Entra RBAC, disabled shared keys, TLS, and private containers still
+  protect access. A private runner would enable a private storage endpoint.

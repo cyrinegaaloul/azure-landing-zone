@@ -9,13 +9,31 @@ locals {
 resource "azurerm_kubernetes_cluster" "aks" {
   count = var.enable_aks_demo ? 1 : 0
 
-  name                      = local.aks_cluster_name
-  location                  = var.location
-  resource_group_name       = var.resource_group_name
-  dns_prefix                = local.aks_dns_prefix
-  sku_tier                  = "Free"
-  oidc_issuer_enabled       = true
-  workload_identity_enabled = true
+  name                              = local.aks_cluster_name
+  location                          = var.location
+  resource_group_name               = var.resource_group_name
+  dns_prefix                        = local.aks_dns_prefix
+  sku_tier                          = "Free"
+  oidc_issuer_enabled               = true
+  workload_identity_enabled         = true
+  role_based_access_control_enabled = true
+  local_account_disabled            = true
+  automatic_upgrade_channel         = var.automatic_upgrade_channel
+  node_os_upgrade_channel           = var.node_os_upgrade_channel
+
+  dynamic "api_server_access_profile" {
+    for_each = length(var.api_server_authorized_ip_ranges) > 0 ? [1] : []
+
+    content {
+      authorized_ip_ranges = var.api_server_authorized_ip_ranges
+    }
+  }
+
+  azure_active_directory_role_based_access_control {
+    tenant_id              = var.tenant_id
+    azure_rbac_enabled     = true
+    admin_group_object_ids = []
+  }
 
   default_node_pool {
     name           = "system"
@@ -34,10 +52,19 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
   network_profile {
     network_plugin    = "azure"
+    network_policy    = "azure"
     load_balancer_sku = "standard"
   }
 
   tags = var.common_tags
+}
+
+resource "azurerm_role_assignment" "cluster_admin" {
+  for_each = var.enable_aks_demo ? var.cluster_admin_principal_ids : toset([])
+
+  scope                = azurerm_kubernetes_cluster.aks[0].id
+  role_definition_name = "Azure Kubernetes Service RBAC Cluster Admin"
+  principal_id         = each.value
 }
 
 resource "azurerm_user_assigned_identity" "app" {

@@ -1,88 +1,56 @@
-# Network Security Traffic Matrix
-
-This document defines the Network Security Group (NSG) rules implemented by the
-networking and root Terraform modules. Rules use logical subnet keys so CIDR
-changes remain centralized in the root `subnets` variable.
+# Network Security
 
 ## Subnets
 
-| Subnet key | Default CIDR | NSG name | Purpose |
+| Subnet | Default CIDR | Function |
+|---|---|---|
+| `management` | `10.10.0.0/24` | Reserved administrator path; disabled by default. |
+| `private-endpoints` | `10.10.1.0/24` | Key Vault private endpoint with NSG policy enabled. |
+| `aks` | `10.10.2.0/24` | AKS nodes, Azure CNI pods, and internal LoadBalancer. |
+| `appgw` | `10.10.3.0/24` | Dedicated Application Gateway v2 subnet. |
+| `apim` | `10.10.4.0/24` | Internal API Management subnet. |
+
+## Enforced application path
+
+Custom allows are evaluated before priority-4000 denies that override Azure's
+default `AllowVNetInBound` and `AllowVNetOutBound` rules.
+
+| Source | Destination | Ports | Purpose |
 |---|---|---|---|
-| `management` | `10.10.0.0/24` | `nsg-management-alz-dev` | Optional administrative source. |
-| `private-endpoints` | `10.10.1.0/24` | `nsg-private-endpoints-alz-dev` | Key Vault and other private endpoints. |
-| `aks` | `10.10.2.0/24` | `nsg-aks-alz-dev` | AKS nodes and workload traffic. |
-| `appgw` | `10.10.3.0/24` | `nsg-appgw-alz-dev` | Application Gateway WAF_v2. |
-| `apim` | `10.10.4.0/24` | `nsg-apim-alz-dev` | Dedicated, non-delegated subnet for classic APIM internal VNet mode. |
+| Internet | App Gateway | TCP 80 | Development frontend only. |
+| GatewayManager | App Gateway | TCP 65200-65535 | Required v2 infrastructure. |
+| App Gateway subnet | APIM subnet | TCP 443 | Trusted HTTPS backend. |
+| ApiManagement | APIM subnet | TCP 3443 | Required APIM control plane. |
+| AzureLoadBalancer | APIM subnet | TCP 6390 | Required APIM probes. |
+| APIM subnet | AKS subnet | TCP 80 | Internal application backend. |
+| AzureLoadBalancer | AKS subnet | TCP 30000-32767 | AKS service probes. |
+| AKS subnet | Private endpoints | TCP 443 | Private Key Vault access. |
 
-Each subnet has a dedicated NSG and subnet association.
+Self-subnet rules preserve Application Gateway scale-unit, APIM instance, and
+AKS node/Azure CNI communication. APIM also receives explicit outbound rules
+for its documented Azure dependencies: Internet HTTP, Storage HTTPS, SQL,
+Key Vault, Azure Monitor, and Azure-provided DNS. AKS retains HTTPS access for
+image pulls and Azure platform endpoints.
 
-## Traffic Matrix
+After approved paths, VNet inbound/outbound denies prevent arbitrary subnets
+from reaching App Gateway, APIM, AKS, or the Key Vault endpoint. Internet has no
+direct APIM or AKS listener. NSGs are stateful, so response traffic does not
+need mirrored rules.
 
-| Source | Destination | Port | Protocol | Action | Rule | Priority |
-|---|---|---:|---|---|---|---:|
-| `Internet` | Application Gateway | 443 | TCP | Allow | `internet-to-appgw-https` | 100 inbound |
-| `Internet` | Application Gateway | 80 | TCP | Conditional allow | `internet-to-appgw-http-bootstrap` | 110 inbound |
-| `GatewayManager` | Application Gateway | 65200-65535 | TCP | Conditional allow | `gateway-manager-to-appgw-infrastructure` | 120 inbound |
-| Application Gateway subnet | APIM subnet | 443 | TCP | Conditional allow | `appgw-to-apim-gateway-https` | 100 inbound |
-| `ApiManagement` | APIM subnet | 3443 | TCP | Conditional allow | `api-management-control-plane` | 110 inbound |
-| `AzureLoadBalancer` | APIM subnet | 6390 | TCP | Conditional allow | `azure-load-balancer-to-apim-infrastructure` | 120 inbound |
-| `AzureLoadBalancer` | AKS | 30000-32767 | TCP | Allow | `azure-load-balancer-to-aks-probes` | 100 inbound |
-| APIM subnet | AKS internal LoadBalancer | 80 | TCP | Conditional allow | `apim-to-aks-backend-http` | 210 inbound |
-| APIM subnet | AKS subnet | 80 | TCP | Conditional allow | `apim-to-aks-backend-http-egress` | 100 outbound |
-| APIM subnet | `Internet` | 80 | TCP | Conditional allow | `apim-to-internet-http` | 110 outbound |
-| APIM subnet | `Storage` | 443 | TCP | Conditional allow | `apim-to-storage-https` | 120 outbound |
-| APIM subnet | `Sql` | 1433 | TCP | Conditional allow | `apim-to-sql` | 130 outbound |
-| APIM subnet | `AzureKeyVault` | 443 | TCP | Conditional allow | `apim-to-key-vault-https` | 140 outbound |
-| APIM subnet | `AzureMonitor` | 1886, 443 | TCP | Conditional allow | `apim-to-azure-monitor` | 150 outbound |
-| AKS | Private endpoints | 443 | TCP | Allow | `aks-to-private-endpoints-https` | 200 inbound |
-| AKS | `Internet` | 443 | TCP | Allow | `aks-to-internet-https` | 200 outbound |
-| Management | AKS | 22, 3389 | TCP | Conditional allow | `management-to-aks-admin` | 300 inbound |
-| Any | Any | Other traffic | Any | Azure default fallback | Built-in NSG rules | 65000+ |
+## Private endpoint DNS
 
-Conditional rules are created by root locals:
+The full profile creates `privatelink.vaultcore.azure.net`, links it to the
+landing-zone VNet, and associates it with the Key Vault private endpoint. AKS
+therefore resolves the standard vault hostname to the endpoint address. The
+provider's private-endpoint NSG policy is enabled on the dedicated subnet so
+the allow/deny rules are effective.
 
-- `enable_edge_stack` controls the HTTP bootstrap and `GatewayManager` rules;
-- `enable_apim` controls APIM infrastructure, dependency, gateway-to-APIM, and
-  APIM-to-AKS rules;
-- `enable_management_access` controls the internal SSH/RDP rule.
+## Kubernetes NetworkPolicy
 
-## Rule Design
+The application policy allows APIM traffic, AKS node/probe traffic, Prometheus
+scraping, DNS, and private-endpoint HTTPS. Other selected-pod ingress and egress
+is denied. Workload Identity token projection and the node-level CSI provider
+remain functional because the policy selects only the application pod.
 
-- Priorities 100-199 are reserved for ingress and Azure platform traffic,
-  200-299 for application flows, and 300-399 for optional administration.
-- NSGs are stateful; response traffic for an allowed connection does not require
-  a reverse rule.
-- Azure service tags are used for `Internet`, `AzureLoadBalancer`, and
-  `GatewayManager` traffic.
-- Subnet-to-subnet rules resolve CIDRs from `var.subnets` rather than embedding
-  addresses in resource definitions.
-- There is no direct Internet path to AKS or the management subnet.
-- The management rule permits reachability only; it does not create hosts,
-  credentials, or listeners.
-
-The AKS probe rule currently uses the Kubernetes NodePort range. Narrow it to
-the final health-check port when the deployed ingress configuration provides a
-stable value.
-
-## Default Rules
-
-No custom blanket deny rule is defined. Azure NSGs already include default
-allow and deny rules, including VNet, load-balancer, Internet-outbound, and
-deny-all fallbacks. Introducing a higher-priority blanket deny without the final
-platform dependency set could interrupt AKS networking, DNS, health probes, or
-Application Gateway management traffic.
-
-Before production enforcement, validate all required platform flows and then
-evaluate scoped deny rules or centralized egress controls.
-
-## Deferred Networking
-
-- The repository reserves the APIM subnet for classic Developer-tier APIM
-  internal VNet injection and configures no service delegation. Azure permits
-  other resource types in the subnet, but this design keeps it exclusive for
-  isolation.
-- Key Vault private endpoints and their network policies are not implemented.
-- Prometheus and Grafana run inside AKS and require no separate subnet.
-
-See [`edge.md`](edge.md) for gateway ownership and bootstrap details and
-[`apim.md`](apim.md) for the API gateway topology.
+Authorized source CIDRs are rendered from Terraform outputs rather than copied
+manually into a deployment manifest.

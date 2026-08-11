@@ -28,6 +28,10 @@ resource "azurerm_subnet" "landing_zone" {
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.landing_zone.name
   address_prefixes     = each.value.address_prefixes
+
+  # Private endpoint policies are disabled by Azure by default. Enabling the
+  # NSG policy makes the dedicated subnet's explicit segmentation enforceable.
+  private_endpoint_network_policies = each.key == "private-endpoints" ? "NetworkSecurityGroupEnabled" : "Disabled"
 }
 
 resource "azurerm_network_security_group" "landing_zone" {

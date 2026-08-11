@@ -89,6 +89,37 @@ variable "key_vault_public_network_access_enabled" {
   default     = true
 }
 
+variable "enable_key_vault_private_endpoint" {
+  description = "Creates private Key Vault connectivity and Private DNS integration"
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.enable_key_vault_private_endpoint || (var.enable_key_vault && !var.key_vault_public_network_access_enabled)
+    error_message = "A Key Vault private endpoint requires Key Vault enabled and public network access disabled."
+  }
+}
+
+variable "key_vault_secrets_officer_principal_ids" {
+  description = "Temporary principal object IDs allowed to create the bootstrap demo secret"
+  type        = set(string)
+  default     = []
+}
+
+variable "private_endpoint_subnet_id" {
+  description = "Resource ID of the dedicated private-endpoints subnet"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "virtual_network_id" {
+  description = "Landing-zone VNet resource ID linked to the Key Vault Private DNS zone"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 variable "role_assignments" {
   type = map(object({
     scope_key            = string

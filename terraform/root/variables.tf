@@ -117,7 +117,7 @@ variable "subnets" {
 }
 
 variable "nsg_rules" {
-  description = "Approved environment NSG rules keyed by logical rule name"
+  description = "Additional approved environment NSG rules keyed by logical rule name"
   type = map(object({
     nsg_key                    = string
     priority                   = number
@@ -133,44 +133,7 @@ variable "nsg_rules" {
     description                = string
   }))
 
-  default = {
-    internet-to-appgw-https = {
-      nsg_key                 = "appgw"
-      priority                = 100
-      direction               = "Inbound"
-      destination_port_ranges = ["443"]
-      source_address_prefix   = "Internet"
-      destination_subnet_key  = "appgw"
-      description             = "Future public HTTPS entry through Application Gateway only"
-    }
-    azure-load-balancer-to-aks-probes = {
-      nsg_key                 = "aks"
-      priority                = 100
-      direction               = "Inbound"
-      destination_port_ranges = ["30000-32767"]
-      source_address_prefix   = "AzureLoadBalancer"
-      destination_subnet_key  = "aks"
-      description             = "Future AKS load-balancer health probes over the default NodePort range"
-    }
-    aks-to-private-endpoints-https = {
-      nsg_key                 = "private-endpoints"
-      priority                = 200
-      direction               = "Inbound"
-      destination_port_ranges = ["443"]
-      source_subnet_key       = "aks"
-      destination_subnet_key  = "private-endpoints"
-      description             = "AKS access to Key Vault and future private endpoints over HTTPS"
-    }
-    aks-to-internet-https = {
-      nsg_key                    = "aks"
-      priority                   = 200
-      direction                  = "Outbound"
-      destination_port_ranges    = ["443"]
-      source_subnet_key          = "aks"
-      destination_address_prefix = "Internet"
-      description                = "AKS image pulls and required external HTTPS endpoints"
-    }
-  }
+  default = {}
 
   validation {
     condition = alltrue([
@@ -189,6 +152,11 @@ variable "enable_management_access" {
   description = "Creates an internal management-subnet SSH/RDP rule to the AKS subnet when explicitly enabled"
   type        = bool
   default     = false
+
+  validation {
+    condition     = !var.enable_management_access || var.enable_aks_demo
+    error_message = "enable_management_access requires the AKS profile."
+  }
 }
 
 variable "enable_edge_stack" {
@@ -214,8 +182,12 @@ variable "enable_apim" {
   default     = false
 
   validation {
-    condition     = !var.enable_apim || (var.enable_edge_stack && var.enable_aks_demo)
-    error_message = "enable_apim requires enable_edge_stack and enable_aks_demo for the Application Gateway -> internal APIM -> AKS path."
+    condition = (
+      (!var.enable_key_vault && !var.enable_key_vault_private_endpoint && !var.enable_aks_demo && !var.enable_edge_stack && !var.enable_apim) ||
+      (var.enable_key_vault && !var.enable_key_vault_private_endpoint && !var.enable_aks_demo && !var.enable_edge_stack && !var.enable_apim && var.key_vault_public_network_access_enabled) ||
+      (var.enable_key_vault && var.enable_key_vault_private_endpoint && var.enable_aks_demo && var.enable_edge_stack && var.enable_apim && !var.key_vault_public_network_access_enabled)
+    )
+    error_message = "Use a functional profile: core (all optional components off), Key Vault bootstrap (only public Key Vault on), or full (Key Vault private endpoint, AKS, APIM, and edge all on with Key Vault public access off)."
   }
 }
 
@@ -316,9 +288,27 @@ variable "enable_key_vault_purge_protection" {
 }
 
 variable "key_vault_public_network_access_enabled" {
-  description = "Allows public network connectivity to Key Vault; disable only after private networking is implemented"
+  description = "Allows public Key Vault access only for the one-time Key Vault bootstrap profile"
   type        = bool
   default     = true
+}
+
+variable "enable_key_vault_private_endpoint" {
+  description = "Creates a Key Vault private endpoint and Private DNS integration"
+  type        = bool
+  default     = false
+}
+
+variable "key_vault_bootstrap_principal_object_id" {
+  description = "Optional human principal object ID temporarily granted Key Vault Secrets Officer during bootstrap"
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.key_vault_bootstrap_principal_object_id == null || can(regex("^[0-9a-fA-F-]{36}$", var.key_vault_bootstrap_principal_object_id))
+    error_message = "key_vault_bootstrap_principal_object_id must be null or a valid Microsoft Entra object ID."
+  }
 }
 
 variable "enable_aks_demo" {
@@ -348,4 +338,34 @@ variable "aks_internal_load_balancer_ip" {
     condition     = try(can(cidrhost("${var.aks_internal_load_balancer_ip}/32", 0)) && cidrcontains(var.subnets["aks"].address_prefixes[0], var.aks_internal_load_balancer_ip), false)
     error_message = "aks_internal_load_balancer_ip must be a valid IPv4 address inside the configured AKS subnet. Confirm that Azure has not already allocated it before deployment."
   }
+}
+
+variable "aks_deployer_principal_object_id" {
+  description = "Optional GitHub OIDC service-principal object ID granted AKS RBAC cluster administration"
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.aks_deployer_principal_object_id == null || can(regex("^[0-9a-fA-F-]{36}$", var.aks_deployer_principal_object_id))
+    error_message = "aks_deployer_principal_object_id must be null or a valid Microsoft Entra object ID."
+  }
+}
+
+variable "aks_api_server_authorized_ip_ranges" {
+  description = "Optional public CIDR ranges allowed to reach the AKS API server; empty preserves the Azure-managed public endpoint behavior"
+  type        = list(string)
+  default     = []
+}
+
+variable "aks_automatic_upgrade_channel" {
+  description = "AKS Kubernetes automatic upgrade channel"
+  type        = string
+  default     = "patch"
+}
+
+variable "aks_node_os_upgrade_channel" {
+  description = "AKS node operating-system upgrade channel"
+  type        = string
+  default     = "NodeImage"
 }

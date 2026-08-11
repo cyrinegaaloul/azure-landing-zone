@@ -23,11 +23,6 @@ output "workload_identity" {
   } : null
 }
 
-output "key_vault_role_assignment_id" {
-  description = "Key Vault Secrets User role assignment ID when AKS and Key Vault are enabled, otherwise null"
-  value       = var.enable_aks_demo && var.enable_key_vault ? azurerm_role_assignment.key_vault_secrets_user[0].id : null
-}
-
 output "application_backend_url" {
   description = "Internal AKS LoadBalancer URL used by API Management when AKS is enabled"
   value       = var.enable_aks_demo ? "http://${var.application_backend_ip}" : null

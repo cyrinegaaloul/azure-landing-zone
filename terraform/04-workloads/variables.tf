@@ -53,3 +53,33 @@ variable "application_backend_ip" {
   description = "Static private IP reserved for the application's internal Kubernetes LoadBalancer"
   type        = string
 }
+
+variable "tenant_id" {
+  description = "Microsoft Entra tenant used for AKS authentication"
+  type        = string
+  sensitive   = true
+}
+
+variable "cluster_admin_principal_ids" {
+  description = "Microsoft Entra group or service-principal object IDs granted AKS RBAC cluster administration"
+  type        = set(string)
+  default     = []
+}
+
+variable "api_server_authorized_ip_ranges" {
+  description = "Optional CIDR ranges allowed to reach the public AKS API endpoint"
+  type        = list(string)
+  default     = []
+}
+
+variable "automatic_upgrade_channel" {
+  description = "AKS Kubernetes automatic upgrade channel"
+  type        = string
+  default     = "patch"
+}
+
+variable "node_os_upgrade_channel" {
+  description = "AKS node operating-system upgrade channel"
+  type        = string
+  default     = "NodeImage"
+}

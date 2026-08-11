@@ -1,87 +1,94 @@
 # CI/CD Pipelines
 
-This directory documents the GitHub Actions workflows in
-`.github/workflows/`. Validation and image publication are automatic; Azure
-planning and deployment are manual.
+The repository uses two GitHub Actions workflows. Image publication is part of
+validation, so an image cannot bypass the checks that evaluated it.
 
 ## Workflows
 
-| Workflow | Trigger | Purpose | Azure changes |
-|---|---|---|---|
-| `validate.yml` | Push to `main`, pull request | Validates source, manifests, image, and security configuration. | None |
-| `build-image.yml` | Changes under `app/` on `main`, manual | Builds and publishes the application image to GHCR. | None |
-| `demo-deploy.yml` | Manual | Runs the selected Terraform `plan`, `apply`, or `destroy` action. | Depends on selected action |
-
-## Validation Pipeline
-
-`validate.yml` contains two jobs.
-
-### Terraform validation
-
-1. Check formatting with `terraform fmt -check -recursive`.
-2. Initialize the root module without a backend.
-3. Run `terraform validate`.
-4. Scan Terraform configuration with Trivy.
-
-### Application and Kubernetes validation
-
-1. Compile `app/server.py` to validate Python syntax.
-2. Build the application image once and scan the local image with Trivy.
-3. Render `app/k8s` once with Kustomize.
-4. Validate built-in Kubernetes resources with kubeconform.
-5. Scan the rendered resources with Trivy.
-6. Parse the OpenAPI and monitoring YAML files.
-7. Validate the Grafana dashboard JSON and the `ServiceMonitor` manifest.
-8. Scan monitoring configuration with Trivy.
-
-Trivy reports `HIGH` and `CRITICAL` findings and returns a failing exit code for
-either severity. Kubeconform skips only external custom resources whose schemas
-are supplied by components installed later:
-
-- `SecretProviderClass` from the Azure Key Vault provider add-on;
-- `ServiceMonitor` from `kube-prometheus-stack`.
-
-The validation workflow requires only `contents: read`. It does not authenticate
-to Azure, push images, install Helm releases, or contact a Kubernetes cluster.
-
-## Image Publication
-
-`build-image.yml` publishes:
-
-```text
-ghcr.io/<repository-owner>/landing-zone-demo-app:<commit-sha>
-ghcr.io/<repository-owner>/landing-zone-demo-app:latest
-```
-
-The SHA tag is immutable and should be used in `app/k8s/deployment.yaml` for a
-deployment. The `latest` tag is published only from the default branch.
-
-The workflow uses `GITHUB_TOKEN` with `packages: write`; no separate registry
-credential is required. If the package is private, configure an image pull
-secret or another supported GHCR authentication method in AKS.
-
-## Manual Terraform Workflow
-
-`demo-deploy.yml` accepts these inputs:
-
-| Input | Default | Description |
+| Workflow | Trigger | Function |
 |---|---|---|
-| `action` | `plan` | Terraform action: `plan`, `apply`, or `destroy`. |
-| `enable_aks` | `false` | Enables conditional AKS resources. |
-| `enable_edge` | `false` | Enables the Application Gateway WAF_v2 public frontend. |
-| `enable_apim` | `false` | Enables internal Developer-tier APIM; requires both `enable_edge=true` and `enable_aks=true`. |
+| `validate-build-publish` | Pull request and push to `main` | Validate code/configuration, build once, scan, generate an SBOM, and publish the exact SHA image only on `main`. |
+| `controlled-demo-deployment` | Manual dispatch from `main` | Plan against persistent state, optionally apply the reviewed plan, render deployment values, deploy, and smoke-test. |
 
-The workflow passes configuration through `TF_VAR_` environment variables and
-does not depend on a local `terraform.tfvars` file.
+### CI gate
 
-Required repository or environment secrets:
+The validation order is Terraform formatting/validation, Terraform Trivy scan,
+Python tests, Kustomize/kubeconform, Kubernetes Trivy scan, YAML/JSON parsing,
+Docker build, image scan, SBOM generation, and conditional push.
 
-| Secret | Purpose |
+The image is tagged `ghcr.io/<owner>/landing-zone-demo-app:<git-sha>`. It is
+built once and scanned locally before `docker push`. Pull requests have no
+publish step. HIGH/CRITICAL vulnerabilities are reported; fixable
+HIGH/CRITICAL vulnerabilities fail the image gate. Terraform and Kubernetes
+HIGH/CRITICAL misconfigurations fail their gates.
+
+### Controlled deployment
+
+Workflow concurrency prevents simultaneous state operations. `plan` produces a
+saved plan and a readable plan artifact. `apply` and `destroy` generate the
+saved plan in the same run, pause at the protected `demo-apply` environment,
+then apply that exact binary plan. Pull requests never deploy.
+
+Full/secure apply also:
+
+- pulls the image for the selected commit and resolves its registry digest;
+- reads AKS, identity, network, Key Vault, and edge Terraform outputs;
+- renders an untracked manifest with `scripts/render-kubernetes.ps1`;
+- installs `kube-prometheus-stack` chart `86.0.1` and applies monitoring config;
+- applies the rendered application, waits for rollout, and smoke-tests
+  `http://<application-gateway-ip>/demo/health`.
+
+## GitHub configuration
+
+Create protected environments `demo-plan` and `demo-apply`. Require a reviewer
+for `demo-apply`.
+
+Repository/environment secrets:
+
+| Name | Value |
 |---|---|
-| `AZURE_CLIENT_ID` | Client ID of the Entra application or managed identity trusted through GitHub OIDC. |
-| `AZURE_SUBSCRIPTION_ID` | AzureRM provider subscription. |
-| `AZURE_TENANT_ID` | Tenant-scoped resources such as Key Vault. |
+| `AZURE_CLIENT_ID` | Application/client ID of the GitHub OIDC identity. |
+| `AZURE_TENANT_ID` | Microsoft Entra tenant ID. |
+| `AZURE_SUBSCRIPTION_ID` | Target Azure subscription ID. |
 
-Protect the `demo` GitHub environment with required reviewers. The workflow
-uses GitHub OIDC and requires a federated identity credential whose subject
-matches that environment; it does not use a client secret or credentials JSON.
+Repository/environment variables:
+
+| Name | Required | Value |
+|---|---:|---|
+| `TFSTATE_RESOURCE_GROUP` | Yes | Backend resource group name. |
+| `TFSTATE_STORAGE_ACCOUNT` | Yes | Backend storage account name. |
+| `TFSTATE_CONTAINER` | Yes | `tfstate`. |
+| `AZURE_PRINCIPAL_OBJECT_ID` | Full profile | Object ID, not client ID, of the GitHub OIDC service principal for AKS RBAC. |
+| `PLATFORM_ADMIN_GROUP_OBJECT_ID` | Optional | Platform administrators Entra group object ID. |
+| `NETWORK_OPERATOR_GROUP_OBJECT_ID` | Optional | Network operators Entra group object ID. |
+| `SECURITY_READER_GROUP_OBJECT_ID` | Optional | Security readers Entra group object ID. |
+| `KEY_VAULT_BOOTSTRAP_PRINCIPAL_OBJECT_ID` | Bootstrap only | Human object ID temporarily granted Key Vault Secrets Officer. |
+
+The GitHub identity needs the existing scoped Terraform permissions, `Storage
+Blob Data Contributor` on backend storage, and the conditional AKS RBAC role
+created by Terraform. It does not require a client secret or `AZURE_CREDENTIALS`.
+
+For the first landing-zone deployment, the automation principal needs
+`Contributor` to create resources and `Role Based Access Control Administrator`
+to create the scoped role assignments represented in Terraform. Scope these as
+narrowly as the bootstrap process permits and reduce them to the three managed
+resource groups after those groups exist. It never needs Owner. Create two OIDC
+federated credentials because GitHub environment subjects differ for
+`demo-plan` and `demo-apply`.
+
+After the bootstrap profile is applied and RBAC has propagated, the designated
+human creates `demo-secret` directly in the Azure portal. Do not pass the value
+through Terraform, GitHub, shell history, or a committed file. Then apply
+`full`; Terraform removes the temporary Secrets Officer assignment, creates the
+private endpoint, and disables public vault access.
+
+## Profiles and lifecycle
+
+- `core`: non-billable optional application components off.
+- `key-vault-bootstrap`: Key Vault only, temporarily public for secret creation.
+- `full`: complete private-vault application path, WAF Detection, locks off.
+- `secure`: same path, WAF Prevention, network/security RG locks on.
+
+To destroy after the secure profile, first apply `full` to remove locks, then
+dispatch `destroy` with `full`. GitHub token permissions are limited to content
+read, OIDC token creation, GHCR read during deploy, and GHCR write only in CI.

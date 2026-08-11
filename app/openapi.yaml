@@ -42,3 +42,19 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /secret-status:
+    get:
+      summary: Confirm that the Key Vault CSI secret file is mounted
+      operationId: getSecretStatus
+      responses:
+        "200":
+          description: Mount status only; the secret value is never returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secretMounted:
+                    type: boolean
+                required:
+                  - secretMounted

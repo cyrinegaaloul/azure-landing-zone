@@ -20,11 +20,6 @@ output "location" {
   value       = var.location
 }
 
-output "name_prefix" {
-  description = "Standardized name prefix for landing zone resources"
-  value       = local.name_prefix
-}
-
 output "common_tags" {
   description = "Common tags shared across landing zone resources"
   value       = local.common_tags

@@ -27,8 +27,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: landing-zone-demo-app
-          image: ghcr.io/cyrinegaaloul/landing-zone-demo-app:latest
-          imagePullPolicy: Always
+          image: REPLACE_WITH_IMAGE_REFERENCE
+          imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false # No additional process privileges
             capabilities:

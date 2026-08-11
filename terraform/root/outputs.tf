@@ -3,7 +3,6 @@ output "foundation" {
   value = {
     resource_groups = module.foundation.resource_groups
     location        = module.foundation.location
-    name_prefix     = module.foundation.name_prefix
     common_tags     = module.foundation.common_tags
   }
 }
@@ -11,21 +10,14 @@ output "foundation" {
 output "networking" {
   description = "Networking module outputs"
   value = {
-    virtual_network         = module.networking.virtual_network
-    subnets                 = module.networking.subnets
-    network_security_groups = module.networking.network_security_groups
-    network_security_rules  = module.networking.network_security_rules
+    virtual_network = module.networking.virtual_network
+    subnets         = module.networking.subnets
   }
 }
 
 output "security_baseline" {
-  description = "Security baseline module outputs"
-  sensitive   = true
-  value = {
-    role_assignments     = module.security_baseline.role_assignments
-    resource_group_locks = module.security_baseline.resource_group_locks
-    key_vault            = module.security_baseline.key_vault
-  }
+  description = "Key Vault details when enabled, otherwise null"
+  value       = module.security_baseline.key_vault
 }
 
 output "edge" {
@@ -42,9 +34,8 @@ output "workloads" {
   description = "AKS workload module outputs"
   sensitive   = true
   value = {
-    aks_cluster                  = module.workloads.aks_cluster
-    workload_identity            = module.workloads.workload_identity
-    application_backend_url      = module.workloads.application_backend_url
-    key_vault_role_assignment_id = module.workloads.key_vault_role_assignment_id
+    aks_cluster             = module.workloads.aks_cluster
+    workload_identity       = module.workloads.workload_identity
+    application_backend_url = module.workloads.application_backend_url
   }
 }

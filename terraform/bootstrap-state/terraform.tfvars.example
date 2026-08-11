@@ -1,0 +1,10 @@
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+location     = "francecentral"
+project_name = "alz"
+environment  = "dev"
+owner        = "cyrine"
+
+# Add real object IDs only in an ignored terraform.tfvars file or with
+# TF_VAR_backend_principals. Storage Blob Data Contributor is sufficient.
+backend_principals = {}

@@ -91,11 +91,14 @@ resource "azurerm_api_management_api_policy" "this" {
     <policies>
       <inbound>
         <base />
+        <!-- Limit each client IP to 30 requests per minute -->
         <rate-limit-by-key calls="30" renewal-period="60" counter-key="@(context.Request.IpAddress)" />
+        <!-- Add a correlation ID for request tracing -->
         <set-header name="X-Correlation-ID" exists-action="skip">
           <value>@(context.RequestId.ToString())</value>
         </set-header>
       </inbound>
+       <!-- Forward the request to the configured backend -->
       <backend>
         <forward-request />
       </backend>

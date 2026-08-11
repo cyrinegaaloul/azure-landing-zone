@@ -5,6 +5,10 @@
 crash.log
 crash.*.log
 *.tfplan
+backend*.hcl
+
+# Keep documented backend configuration examples
+!backend*.hcl.example
 
 # Terraform variable files that may contain sensitive values
 *.tfvars
