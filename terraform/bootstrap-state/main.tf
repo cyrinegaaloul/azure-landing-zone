@@ -8,35 +8,27 @@ locals {
     demo-plan  = "repo:cyrinegaaloul/azure-landing-zone:environment:demo-plan"
     demo-apply = "repo:cyrinegaaloul/azure-landing-zone:environment:demo-apply"
   }
+
+  subscription_scope = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
 }
 
-data "azurerm_client_config" "current" {}
+data "azurerm_client_config" "current" {} //Discover the currently logged-in Azure identity
 
-data "azuread_client_config" "current" {}
-
-resource "azuread_application" "github_actions" {
-  display_name            = "github-${var.project_name}-${var.environment}-deployment"
-  description             = "GitHub Actions OIDC identity for the Azure Landing Zone deployment workflows"
-  owners                  = [data.azuread_client_config.current.object_id]
-  sign_in_audience        = "AzureADMyOrg"
-  prevent_duplicate_names = true
+resource "azurerm_user_assigned_identity" "github_actions" {
+  name                = "id-github-${var.project_name}-${var.environment}"
+  location            = azurerm_resource_group.state.location
+  resource_group_name = azurerm_resource_group.state.name
+  tags                = local.common_tags
 }
 
-resource "azuread_service_principal" "github_actions" {
-  client_id                    = azuread_application.github_actions.client_id
-  app_role_assignment_required = false
-  owners                       = [data.azuread_client_config.current.object_id]
-}
-
-resource "azuread_application_federated_identity_credential" "github_actions" {
+resource "azurerm_federated_identity_credential" "github_actions" {
   for_each = local.github_oidc_subjects
 
-  application_id = azuread_application.github_actions.id
-  display_name   = each.key
-  description    = "GitHub OIDC trust for the ${each.key} environment"
-  audiences      = ["api://AzureADTokenExchange"]
-  issuer         = "https://token.actions.githubusercontent.com"
-  subject        = each.value
+  name                      = each.key
+  user_assigned_identity_id = azurerm_user_assigned_identity.github_actions.id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = "https://token.actions.githubusercontent.com"
+  subject                   = each.value
 }
 
 resource "azurerm_resource_group" "state" {
@@ -85,13 +77,16 @@ resource "azurerm_storage_container" "state" {
   name                  = "tfstate"
   storage_account_id    = azurerm_storage_account.state.id
   container_access_type = "private" //no public access to data
+
+  depends_on = [azurerm_role_assignment.current_user_state_blob_contributor]
 }
 
 resource "azurerm_role_assignment" "github_state_blob_contributor" {
-  scope                = azurerm_storage_account.state.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azuread_service_principal.github_actions.object_id
-  principal_type       = "ServicePrincipal"
+  scope                            = azurerm_storage_account.state.id
+  role_definition_name             = "Storage Blob Data Contributor"
+  principal_id                     = azurerm_user_assigned_identity.github_actions.principal_id
+  principal_type                   = "ServicePrincipal"
+  skip_service_principal_aad_check = true
 }
 
 resource "azurerm_role_assignment" "current_user_state_blob_contributor" {
@@ -101,4 +96,20 @@ resource "azurerm_role_assignment" "current_user_state_blob_contributor" {
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = data.azurerm_client_config.current.object_id
   principal_type       = "User"
+}
+
+resource "azurerm_role_assignment" "github_deployment" {
+  for_each = toset([
+    "Contributor",
+    "Role Based Access Control Administrator"
+  ])
+
+  # The root creates its three resource groups and role assignments inside
+  # them. Subscription scope is therefore the narrowest scope that exists
+  # before the first deployment and covers every Terraform-managed target.
+  scope                            = local.subscription_scope
+  role_definition_name             = each.value
+  principal_id                     = azurerm_user_assigned_identity.github_actions.principal_id
+  principal_type                   = "ServicePrincipal"
+  skip_service_principal_aad_check = true
 }

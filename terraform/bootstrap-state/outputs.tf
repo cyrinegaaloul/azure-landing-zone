@@ -29,13 +29,13 @@ output "backend_state_key" {
 }
 
 output "github_oidc_client_id" {
-  description = "Client ID copied once to the GitHub AZURE_CLIENT_ID secret"
-  value       = azuread_application.github_actions.client_id
+  description = "GitHub deployment managed identity client ID copied once to the GitHub AZURE_CLIENT_ID secret"
+  value       = azurerm_user_assigned_identity.github_actions.client_id
 }
 
-output "github_service_principal_object_id" {
-  description = "GitHub deployment service principal object ID used for troubleshooting and AKS RBAC configuration"
-  value       = azuread_service_principal.github_actions.object_id
+output "github_managed_identity_principal_id" {
+  description = "GitHub deployment managed identity principal ID used for AKS Azure RBAC configuration"
+  value       = azurerm_user_assigned_identity.github_actions.principal_id
 }
 
 output "tenant_id" {
