@@ -25,13 +25,13 @@ Values supplied automatically:
 - Workload Identity client ID and tenant ID;
 - Key Vault name;
 - immutable `repository@sha256:digest` image reference;
-- AKS internal LoadBalancer address;
+- AKS internal LoadBalancer address and Azure subnet resource name;
 - AKS, APIM, and private-endpoint subnet CIDRs.
 
 The controlled deployment workflow installs monitoring first, applies the
-rendered manifest, waits for the Deployment rollout, and tests the application
-through Application Gateway and APIM. These operations run only after
-infrastructure is intentionally applied.
+rendered manifest, waits for the Deployment rollout and internal LoadBalancer
+address, and tests the application through Application Gateway and APIM. These
+operations run only after infrastructure is intentionally applied.
 
 ## Security behavior
 

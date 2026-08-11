@@ -5,6 +5,7 @@ param(
     [Parameter(Mandatory)] [string] $KeyVaultName,
     [Parameter(Mandatory)] [string] $ImageReference,
     [Parameter(Mandatory)] [string] $BackendIp,
+    [Parameter(Mandatory)] [string] $AksSubnetName,
     [Parameter(Mandatory)] [string] $ApimSubnetCidr,
     [Parameter(Mandatory)] [string] $AksSubnetCidr,
     [Parameter(Mandatory)] [string] $PrivateEndpointSubnetCidr,
@@ -24,6 +25,7 @@ $replacements = [ordered]@{
     'REPLACE_WITH_KEY_VAULT_NAME'             = $KeyVaultName
     'REPLACE_WITH_IMAGE_REFERENCE'            = $ImageReference
     'REPLACE_WITH_AKS_BACKEND_IP'             = $BackendIp
+    'REPLACE_WITH_AKS_SUBNET_NAME'             = $AksSubnetName
     'REPLACE_WITH_APIM_SUBNET_CIDR'            = $ApimSubnetCidr
     'REPLACE_WITH_AKS_SUBNET_CIDR'             = $AksSubnetCidr
     'REPLACE_WITH_PRIVATE_ENDPOINT_SUBNET_CIDR' = $PrivateEndpointSubnetCidr

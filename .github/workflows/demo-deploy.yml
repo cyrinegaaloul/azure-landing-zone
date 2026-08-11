@@ -234,6 +234,7 @@ jobs:
           $networking = terraform -chdir=terraform/root output -json networking | ConvertFrom-Json
           $security = terraform -chdir=terraform/root output -json security_baseline | ConvertFrom-Json
           $foundation = terraform -chdir=terraform/root output -json foundation | ConvertFrom-Json
+          $backendIp = $workloads.application_backend_url.Replace('http://', '')
 
           az aks install-cli
           az aks get-credentials --resource-group $foundation.resource_groups.foundation.name --name $workloads.aks_cluster.name --overwrite-existing
@@ -252,7 +253,8 @@ jobs:
             -TenantId '${{ secrets.AZURE_TENANT_ID }}' `
             -KeyVaultName $security.name `
             -ImageReference $imageReference `
-            -BackendIp $workloads.application_backend_url.Replace('http://', '') `
+            -BackendIp $backendIp `
+            -AksSubnetName $networking.subnets.aks.name `
             -ApimSubnetCidr $networking.subnets.apim.address_prefixes[0] `
             -AksSubnetCidr $networking.subnets.aks.address_prefixes[0] `
             -PrivateEndpointSubnetCidr $networking.subnets.'private-endpoints'.address_prefixes[0] `
@@ -270,6 +272,21 @@ jobs:
           kubectl apply -k monitoring
           kubectl apply -f "$env:RUNNER_TEMP/rendered-manifests.yaml"
           kubectl rollout status deployment/landing-zone-demo-app --namespace demo --timeout 10m
+
+          $loadBalancerReady = $false
+          for ($attempt = 1; $attempt -le 60; $attempt++) {
+            $assignedIp = kubectl get service landing-zone-demo-app --namespace demo -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+            if ($assignedIp -eq $backendIp) {
+              $loadBalancerReady = $true
+              break
+            }
+            Start-Sleep -Seconds 10
+          }
+          if (-not $loadBalancerReady) {
+            kubectl get service landing-zone-demo-app --namespace demo -o wide
+            kubectl describe service landing-zone-demo-app --namespace demo
+            throw "AKS internal LoadBalancer did not acquire expected IP $backendIp within ten minutes."
+          }
 
       - name: Smoke test through Application Gateway and APIM
         if: inputs.action == 'apply' && (inputs.profile == 'full' || inputs.profile == 'secure')
