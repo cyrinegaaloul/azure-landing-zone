@@ -45,6 +45,7 @@ resource "azurerm_resource_group" "state" {
   tags     = local.common_tags
 }
 
+# trivy:ignore:AVD-AZU-0012 -- GitHub-hosted OIDC runners require a reachable Blob endpoint. Anonymous container access and shared-key authentication are disabled; Blob access requires Entra ID and scoped RBAC.
 resource "azurerm_storage_account" "state" {
   name                            = local.storage_account_name
   resource_group_name             = azurerm_resource_group.state.name
