@@ -58,7 +58,7 @@ the internship environment remains intentionally destroyable.
 - Azure CLI and an Azure subscription
 - Docker for local image validation
 - `kubectl`, `kubelogin`, and Helm only for a later deployed environment
-- Permission to create a Microsoft Entra application and service principal
+- Permission to create a user-assigned managed identity and Azure role assignments
 - GHCR access for automation
 
 No paid domain, external certificate, monitoring SaaS, Terraform Cloud, or paid
@@ -82,7 +82,7 @@ terraform -chdir=terraform/root init -migrate-state -backend-config=backend.dev.
 ```
 
 `backend.dev.hcl` is ignored. It contains names, not credentials. The bootstrap
-grants `Storage Blob Data Contributor` to its GitHub service principal and,
+grants `Storage Blob Data Contributor` to its GitHub managed identity and,
 optionally, to the current local user. Copy the bootstrap outputs into the
 documented GitHub environment settings before running deployment automation.
 See [Terraform state](docs/terraform-state.md).
@@ -158,7 +158,7 @@ remain visible but do not block this development image.
 | Backend resource group | Isolate state lifecycle | Negligible | Required for remote state |
 | Standard LRS storage account | Versioned, locked Terraform state | Low/negligible | Required for remote state |
 | Private blob container | Store environment state | No separate charge | Required for remote state |
-| Entra application, service principal, and federated credentials | Keyless GitHub OIDC identity | No separate charge | Required for deployment automation |
+| GitHub user-assigned managed identity and federated credentials | Keyless GitHub OIDC identity without an app registration | No separate charge | Required for deployment automation |
 | Backend RBAC assignments | Keyless local/CI access | No charge | Assign only required principals |
 | Key Vault private endpoint | Private AKS-to-vault data path | Low recurring | Disabled in core/bootstrap |
 | Private DNS zone | Resolve the vault hostname privately | Low/negligible | Disabled with the endpoint |

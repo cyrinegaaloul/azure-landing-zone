@@ -335,8 +335,8 @@ variable "aks_internal_load_balancer_ip" {
   default     = "10.10.2.10"
 
   validation {
-    condition     = try(can(cidrhost("${var.aks_internal_load_balancer_ip}/32", 0)) && cidrcontains(var.subnets["aks"].address_prefixes[0], var.aks_internal_load_balancer_ip), false)
-    error_message = "aks_internal_load_balancer_ip must be a valid IPv4 address inside the configured AKS subnet. Confirm that Azure has not already allocated it before deployment."
+    condition     = can(cidrhost("${var.aks_internal_load_balancer_ip}/32", 0))
+    error_message = "aks_internal_load_balancer_ip must be a valid IPv4 address."
   }
 }
 

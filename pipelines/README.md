@@ -47,7 +47,7 @@ Repository/environment secrets:
 
 | Name | Value |
 |---|---|
-| `AZURE_CLIENT_ID` | Application/client ID of the GitHub OIDC identity. |
+| `AZURE_CLIENT_ID` | Client ID of the GitHub deployment user-assigned managed identity. |
 | `AZURE_TENANT_ID` | Microsoft Entra tenant ID. |
 | `AZURE_SUBSCRIPTION_ID` | Target Azure subscription ID. |
 
@@ -59,23 +59,28 @@ Repository/environment variables:
 | `TFSTATE_STORAGE_ACCOUNT` | Yes | Backend storage account name. |
 | `TFSTATE_CONTAINER` | Yes | `tfstate`. |
 | `TFSTATE_KEY` | Yes | `development/azure-landing-zone.tfstate`. |
-| `AZURE_PRINCIPAL_OBJECT_ID` | Full profile | Object ID, not client ID, of the GitHub OIDC service principal for AKS RBAC. |
+| `AZURE_PRINCIPAL_OBJECT_ID` | Full profile | Principal ID, not client ID, of the GitHub deployment managed identity for AKS RBAC. |
 | `PLATFORM_ADMIN_GROUP_OBJECT_ID` | Optional | Platform administrators Entra group object ID. |
 | `NETWORK_OPERATOR_GROUP_OBJECT_ID` | Optional | Network operators Entra group object ID. |
 | `SECURITY_READER_GROUP_OBJECT_ID` | Optional | Security readers Entra group object ID. |
 | `KEY_VAULT_BOOTSTRAP_PRINCIPAL_OBJECT_ID` | Bootstrap only | Human object ID temporarily granted Key Vault Secrets Officer. |
 
-The bootstrap configuration creates the GitHub Entra application, service
-principal, `demo-plan`/`demo-apply` federated credentials, and its `Storage Blob
-Data Contributor` backend assignment. Copy the bootstrap outputs once into the
-settings above. No client secret or `AZURE_CREDENTIALS` is required.
+The bootstrap configuration creates the dedicated GitHub user-assigned managed
+identity, `demo-plan`/`demo-apply` federated credentials, and its backend and
+deployment RBAC assignments. Copy the bootstrap outputs once into the settings
+above. No app registration, client secret, or `AZURE_CREDENTIALS` is required.
 
-For the first landing-zone deployment, the automation principal needs
-`Contributor` to create resources and `Role Based Access Control Administrator`
-to create the scoped role assignments represented in Terraform. Scope these as
-narrowly as the bootstrap process permits and reduce them to the three managed
-resource groups after those groups exist. It never needs Owner. The two GitHub
-environment-specific OIDC trusts are already owned by bootstrap Terraform.
+The bootstrap grants the GitHub managed identity `Contributor` and `Role Based
+Access Control Administrator` at this subscription only. This is the narrowest
+initial scope because the workflow creates the landing-zone resource groups and
+role assignments inside them. It never receives Owner. After the first deploy,
+production hardening could replace this with resource-group assignments plus a
+custom bootstrap process, but that complexity is not required for this project.
+
+The GitHub-hosted runner keeps the normal Azure Login OIDC flow; do not set
+`auth-type: IDENTITY`, which is for managed identities attached to Azure-hosted
+self-hosted runners. The GitHub deployment UAMI remains separate from the AKS
+application Workload Identity UAMI.
 
 After the bootstrap profile is applied and RBAC has propagated, the designated
 human creates `demo-secret` directly in the Azure portal. Do not pass the value

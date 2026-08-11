@@ -7,10 +7,10 @@ provide recovery, while Microsoft Entra data-plane RBAC replaces account keys.
 ## Authentication
 
 The bootstrap discovers the current `az login` identity automatically and can
-grant it `Storage Blob Data Contributor`. It also creates the GitHub Entra
-application, service principal, two environment-scoped federated credentials,
-and the GitHub principal's backend role assignment. No object IDs are supplied
-through bootstrap tfvars.
+grant it `Storage Blob Data Contributor`. It also creates a dedicated GitHub
+user-assigned managed identity, two environment-scoped federated credentials,
+and the identity's backend and deployment role assignments. No object IDs are
+supplied through bootstrap tfvars, and no app registration is required.
 
 After bootstrap, initialize the root with:
 
@@ -23,7 +23,12 @@ GitHub Actions uses the Terraform-managed federated OIDC credentials through
 `azure/login` and the backend's `use_oidc` and `use_azuread_auth` settings. The
 same state key, `development/azure-landing-zone.tfstate`, is used locally and in
 automation. Bootstrap outputs provide the GitHub client ID, tenant,
-subscription, service-principal object ID, and backend names.
+subscription, managed-identity principal ID, and backend names.
+
+The GitHub-hosted runner exchanges its GitHub OIDC token against the federated
+credential on the managed identity. This is distinct from `auth-type: IDENTITY`,
+which is intended for an Azure-hosted self-hosted runner with an attached
+managed identity.
 
 The first root initialization must use `-migrate-state` to copy the existing
 local state. Verify `terraform state list` against the remote backend before
@@ -40,5 +45,6 @@ Standard LRS storage for a small state blob is low/negligible cost. The
 resource group, container, and RBAC assignments have no meaningful independent
 charge. GitHub-hosted runners require a publicly reachable blob endpoint; the
 container remains private, shared-key authentication is disabled, and Entra
-RBAC is required. A future private runner could justify a storage private
-endpoint, but it is outside this internship scope.
+RBAC is required. The bootstrap provider uses `storage_use_azuread = true` for
+container data-plane operations. A future private runner could justify a
+storage private endpoint, but it is outside this internship scope.
