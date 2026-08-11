@@ -6,17 +6,24 @@ provide recovery, while Microsoft Entra data-plane RBAC replaces account keys.
 
 ## Authentication
 
-Local users run `az login` and need `Storage Blob Data Contributor` on the state
-storage account. Initialize with:
+The bootstrap discovers the current `az login` identity automatically and can
+grant it `Storage Blob Data Contributor`. It also creates the GitHub Entra
+application, service principal, two environment-scoped federated credentials,
+and the GitHub principal's backend role assignment. No object IDs are supplied
+through bootstrap tfvars.
+
+After bootstrap, initialize the root with:
 
 ```powershell
 Copy-Item terraform/root/backend.dev.hcl.example terraform/root/backend.dev.hcl
 terraform -chdir=terraform/root init -migrate-state -backend-config=backend.dev.hcl
 ```
 
-GitHub Actions uses federated OIDC credentials through `azure/login` and the
-backend's `use_oidc` and `use_azuread_auth` settings. The same state key,
-`development/azure-landing-zone.tfstate`, is used locally and in automation.
+GitHub Actions uses the Terraform-managed federated OIDC credentials through
+`azure/login` and the backend's `use_oidc` and `use_azuread_auth` settings. The
+same state key, `development/azure-landing-zone.tfstate`, is used locally and in
+automation. Bootstrap outputs provide the GitHub client ID, tenant,
+subscription, service-principal object ID, and backend names.
 
 The first root initialization must use `-migrate-state` to copy the existing
 local state. Verify `terraform state list` against the remote backend before

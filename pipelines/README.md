@@ -58,23 +58,24 @@ Repository/environment variables:
 | `TFSTATE_RESOURCE_GROUP` | Yes | Backend resource group name. |
 | `TFSTATE_STORAGE_ACCOUNT` | Yes | Backend storage account name. |
 | `TFSTATE_CONTAINER` | Yes | `tfstate`. |
+| `TFSTATE_KEY` | Yes | `development/azure-landing-zone.tfstate`. |
 | `AZURE_PRINCIPAL_OBJECT_ID` | Full profile | Object ID, not client ID, of the GitHub OIDC service principal for AKS RBAC. |
 | `PLATFORM_ADMIN_GROUP_OBJECT_ID` | Optional | Platform administrators Entra group object ID. |
 | `NETWORK_OPERATOR_GROUP_OBJECT_ID` | Optional | Network operators Entra group object ID. |
 | `SECURITY_READER_GROUP_OBJECT_ID` | Optional | Security readers Entra group object ID. |
 | `KEY_VAULT_BOOTSTRAP_PRINCIPAL_OBJECT_ID` | Bootstrap only | Human object ID temporarily granted Key Vault Secrets Officer. |
 
-The GitHub identity needs the existing scoped Terraform permissions, `Storage
-Blob Data Contributor` on backend storage, and the conditional AKS RBAC role
-created by Terraform. It does not require a client secret or `AZURE_CREDENTIALS`.
+The bootstrap configuration creates the GitHub Entra application, service
+principal, `demo-plan`/`demo-apply` federated credentials, and its `Storage Blob
+Data Contributor` backend assignment. Copy the bootstrap outputs once into the
+settings above. No client secret or `AZURE_CREDENTIALS` is required.
 
 For the first landing-zone deployment, the automation principal needs
 `Contributor` to create resources and `Role Based Access Control Administrator`
 to create the scoped role assignments represented in Terraform. Scope these as
 narrowly as the bootstrap process permits and reduce them to the three managed
-resource groups after those groups exist. It never needs Owner. Create two OIDC
-federated credentials because GitHub environment subjects differ for
-`demo-plan` and `demo-apply`.
+resource groups after those groups exist. It never needs Owner. The two GitHub
+environment-specific OIDC trusts are already owned by bootstrap Terraform.
 
 After the bootstrap profile is applied and RBAC has propagated, the designated
 human creates `demo-secret` directly in the Azure portal. Do not pass the value

@@ -58,7 +58,8 @@ the internship environment remains intentionally destroyable.
 - Azure CLI and an Azure subscription
 - Docker for local image validation
 - `kubectl`, `kubelogin`, and Helm only for a later deployed environment
-- A GitHub OIDC application/service principal and GHCR access for automation
+- Permission to create a Microsoft Entra application and service principal
+- GHCR access for automation
 
 No paid domain, external certificate, monitoring SaaS, Terraform Cloud, or paid
 GitHub product is required.
@@ -80,9 +81,11 @@ Copy-Item terraform/root/backend.dev.hcl.example terraform/root/backend.dev.hcl
 terraform -chdir=terraform/root init -migrate-state -backend-config=backend.dev.hcl
 ```
 
-`backend.dev.hcl` is ignored. It contains names, not credentials. Local users
-and the GitHub OIDC principal need `Storage Blob Data Contributor` on the state
-storage account. See [Terraform state](docs/terraform-state.md).
+`backend.dev.hcl` is ignored. It contains names, not credentials. The bootstrap
+grants `Storage Blob Data Contributor` to its GitHub service principal and,
+optionally, to the current local user. Copy the bootstrap outputs into the
+documented GitHub environment settings before running deployment automation.
+See [Terraform state](docs/terraform-state.md).
 
 Use `-migrate-state` once so the existing local state is copied into Azure
 Blob Storage instead of starting with an empty state. Confirm the migrated
@@ -155,6 +158,7 @@ remain visible but do not block this development image.
 | Backend resource group | Isolate state lifecycle | Negligible | Required for remote state |
 | Standard LRS storage account | Versioned, locked Terraform state | Low/negligible | Required for remote state |
 | Private blob container | Store environment state | No separate charge | Required for remote state |
+| Entra application, service principal, and federated credentials | Keyless GitHub OIDC identity | No separate charge | Required for deployment automation |
 | Backend RBAC assignments | Keyless local/CI access | No charge | Assign only required principals |
 | Key Vault private endpoint | Private AKS-to-vault data path | Low recurring | Disabled in core/bootstrap |
 | Private DNS zone | Resolve the vault hostname privately | Low/negligible | Disabled with the endpoint |

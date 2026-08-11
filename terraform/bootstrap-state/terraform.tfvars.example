@@ -1,3 +1,5 @@
+# Copy to terraform.tfvars and replace only the subscription ID. No GitHub or
+# Entra principal IDs are required; Terraform creates/discovers them.
 subscription_id = "00000000-0000-0000-0000-000000000000"
 
 location     = "francecentral"
@@ -5,6 +7,6 @@ project_name = "alz"
 environment  = "dev"
 owner        = "cyrine"
 
-# Add real object IDs only in an ignored terraform.tfvars file or with
-# TF_VAR_backend_principals. Storage Blob Data Contributor is sufficient.
-backend_principals = {}
+# Grants the identity running this bootstrap Storage Blob Data Contributor so
+# local Terraform can use Entra authentication for the remote backend.
+grant_current_user_backend_access = true

@@ -28,22 +28,10 @@ variable "owner" {
   default     = "cyrine"
 }
 
-variable "backend_principals" {
-  description = "Optional local and GitHub OIDC principal object IDs granted access to blob state"
-  type = map(object({
-    object_id      = string
-    principal_type = optional(string, "ServicePrincipal")
-  }))
-  default = {}
-
-  validation {
-    condition = alltrue([
-      for principal in values(var.backend_principals) :
-      can(regex("^[0-9a-fA-F-]{36}$", principal.object_id)) &&
-      contains(["ServicePrincipal", "User", "Group"], principal.principal_type)
-    ])
-    error_message = "Each backend principal must use a valid object ID and supported principal type."
-  }
+variable "grant_current_user_backend_access" {
+  description = "Grant the identity running the bootstrap Storage Blob Data Contributor access to the Terraform state backend."
+  type        = bool
+  default     = true
 }
 
 variable "tags" {
