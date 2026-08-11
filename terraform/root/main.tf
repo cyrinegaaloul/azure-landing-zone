@@ -53,20 +53,6 @@ locals {
         destination_address_prefix = "*"
         description                = "Required Application Gateway v2 infrastructure communication"
       }
-      appgw-subnet-internal = {
-        nsg_key                    = "appgw"
-        priority                   = 200
-        direction                  = "Inbound"
-        access                     = "Allow"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = null
-        source_subnet_key          = "appgw"
-        destination_subnet_key     = "appgw"
-        destination_address_prefix = null
-        description                = "Required communication between Application Gateway v2 instances"
-      }
       appgw-to-apim-https = {
         nsg_key                    = "appgw"
         priority                   = 100
@@ -80,62 +66,6 @@ locals {
         destination_subnet_key     = "apim"
         destination_address_prefix = null
         description                = "Application Gateway forwarding to the internal API Management HTTPS gateway"
-      }
-      appgw-to-azure-dns = {
-        nsg_key                    = "appgw"
-        priority                   = 110
-        direction                  = "Outbound"
-        access                     = "Allow"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["53"]
-        source_address_prefix      = null
-        source_subnet_key          = "appgw"
-        destination_address_prefix = "AzurePlatformDNS"
-        destination_subnet_key     = null
-        description                = "Azure-provided DNS resolution required for the APIM backend hostname"
-      }
-      appgw-subnet-internal-egress = {
-        nsg_key                    = "appgw"
-        priority                   = 200
-        direction                  = "Outbound"
-        access                     = "Allow"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = null
-        source_subnet_key          = "appgw"
-        destination_subnet_key     = "appgw"
-        destination_address_prefix = null
-        description                = "Required communication between Application Gateway v2 instances"
-      }
-      deny-vnet-to-appgw = {
-        nsg_key                    = "appgw"
-        priority                   = 4000
-        direction                  = "Inbound"
-        access                     = "Deny"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = "VirtualNetwork"
-        source_subnet_key          = null
-        destination_subnet_key     = "appgw"
-        destination_address_prefix = null
-        description                = "Overrides Azure's default AllowVNetInBound after approved paths"
-      }
-      deny-appgw-to-vnet = {
-        nsg_key                    = "appgw"
-        priority                   = 4000
-        direction                  = "Outbound"
-        access                     = "Deny"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = null
-        source_subnet_key          = "appgw"
-        destination_address_prefix = "VirtualNetwork"
-        destination_subnet_key     = null
-        description                = "Overrides Azure's default AllowVNetOutBound after approved paths"
       }
     } : name => rule
     if var.enable_edge_stack
@@ -184,20 +114,6 @@ locals {
         destination_address_prefix = null
         destination_subnet_key     = "apim"
         description                = "Azure Load Balancer infrastructure probes required by API Management"
-      }
-      apim-subnet-internal = {
-        nsg_key                    = "apim"
-        priority                   = 200
-        direction                  = "Inbound"
-        access                     = "Allow"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = null
-        source_subnet_key          = "apim"
-        destination_address_prefix = null
-        destination_subnet_key     = "apim"
-        description                = "Required communication between internal API Management instances"
       }
       apim-to-aks-backend-http = {
         nsg_key                    = "aks"
@@ -297,62 +213,6 @@ locals {
         destination_subnet_key     = null
         description                = "API Management diagnostics, metrics, and resource health"
       }
-      apim-to-azure-dns = {
-        nsg_key                    = "apim"
-        priority                   = 160
-        direction                  = "Outbound"
-        access                     = "Allow"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["53"]
-        source_address_prefix      = null
-        source_subnet_key          = "apim"
-        destination_address_prefix = "AzurePlatformDNS"
-        destination_subnet_key     = null
-        description                = "Azure-provided DNS resolution required by internal API Management"
-      }
-      apim-subnet-internal-egress = {
-        nsg_key                    = "apim"
-        priority                   = 200
-        direction                  = "Outbound"
-        access                     = "Allow"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = null
-        source_subnet_key          = "apim"
-        destination_address_prefix = null
-        destination_subnet_key     = "apim"
-        description                = "Required communication between internal API Management instances"
-      }
-      deny-vnet-to-apim = {
-        nsg_key                    = "apim"
-        priority                   = 4000
-        direction                  = "Inbound"
-        access                     = "Deny"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = "VirtualNetwork"
-        source_subnet_key          = null
-        destination_address_prefix = null
-        destination_subnet_key     = "apim"
-        description                = "Overrides Azure's default AllowVNetInBound after approved paths"
-      }
-      deny-apim-to-vnet = {
-        nsg_key                    = "apim"
-        priority                   = 4000
-        direction                  = "Outbound"
-        access                     = "Deny"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = null
-        source_subnet_key          = "apim"
-        destination_address_prefix = "VirtualNetwork"
-        destination_subnet_key     = null
-        description                = "Overrides Azure's default AllowVNetOutBound after approved paths"
-      }
     } : name => rule
     if var.enable_apim
   }
@@ -372,20 +232,6 @@ locals {
         destination_address_prefix = null
         destination_subnet_key     = "aks"
         description                = "Azure Load Balancer health probes for AKS services"
-      }
-      aks-subnet-internal = {
-        nsg_key                    = "aks"
-        priority                   = 220
-        direction                  = "Inbound"
-        access                     = "Allow"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = null
-        source_subnet_key          = "aks"
-        destination_address_prefix = null
-        destination_subnet_key     = "aks"
-        description                = "Required AKS node and Azure CNI pod communication"
       }
       aks-to-private-endpoints-https = {
         nsg_key                    = "aks"
@@ -415,62 +261,6 @@ locals {
         destination_subnet_key     = null
         description                = "AKS image pulls and required Azure HTTPS endpoints"
       }
-      aks-to-azure-dns = {
-        nsg_key                    = "aks"
-        priority                   = 210
-        direction                  = "Outbound"
-        access                     = "Allow"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["53"]
-        source_address_prefix      = null
-        source_subnet_key          = "aks"
-        destination_address_prefix = "AzurePlatformDNS"
-        destination_subnet_key     = null
-        description                = "Azure-provided DNS resolution required by AKS and Key Vault private DNS"
-      }
-      aks-subnet-internal-egress = {
-        nsg_key                    = "aks"
-        priority                   = 220
-        direction                  = "Outbound"
-        access                     = "Allow"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = null
-        source_subnet_key          = "aks"
-        destination_address_prefix = null
-        destination_subnet_key     = "aks"
-        description                = "Required AKS node and Azure CNI pod communication"
-      }
-      deny-vnet-to-aks = {
-        nsg_key                    = "aks"
-        priority                   = 4000
-        direction                  = "Inbound"
-        access                     = "Deny"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = "VirtualNetwork"
-        source_subnet_key          = null
-        destination_address_prefix = null
-        destination_subnet_key     = "aks"
-        description                = "Overrides Azure's default AllowVNetInBound after APIM, management, probe, and AKS-internal paths"
-      }
-      deny-aks-to-vnet = {
-        nsg_key                    = "aks"
-        priority                   = 4000
-        direction                  = "Outbound"
-        access                     = "Deny"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = null
-        source_subnet_key          = "aks"
-        destination_address_prefix = "VirtualNetwork"
-        destination_subnet_key     = null
-        description                = "Overrides Azure's default AllowVNetOutBound after approved paths"
-      }
     } : name => rule
     if var.enable_aks_demo
   }
@@ -491,28 +281,13 @@ locals {
         destination_subnet_key     = "private-endpoints"
         description                = "AKS access to the Key Vault private endpoint over HTTPS"
       }
-      deny-vnet-to-private-endpoints = {
-        nsg_key                    = "private-endpoints"
-        priority                   = 4000
-        direction                  = "Inbound"
-        access                     = "Deny"
-        protocol                   = "*"
-        source_port_range          = "*"
-        destination_port_ranges    = ["*"]
-        source_address_prefix      = "VirtualNetwork"
-        source_subnet_key          = null
-        destination_address_prefix = null
-        destination_subnet_key     = "private-endpoints"
-        description                = "Overrides Azure's default AllowVNetInBound after approved private endpoint paths"
-      }
     } : name => rule
     if var.enable_key_vault_private_endpoint
   }
 
   entra_group_role_assignments = {
     for name, assignment in {
-      # Principal: optional platform administrators Entra group. Contributor is
-      # limited to the foundation resource group for platform resource changes.
+      # Principal: optional platform administrators Entra group. The Contributor role is limited to the foundation resource group for resource management.
       platform-administrators = {
         scope_key            = "foundation"
         role_definition_name = "Contributor"
@@ -520,8 +295,7 @@ locals {
         principal_type       = "Group"
         description          = "Platform administrators manage resources in the foundation resource group without managing access"
       }
-      # Principal: optional network operators Entra group. Network Contributor
-      # is limited to the network resource group for network administration.
+      # Principal: optional network operators Entra group. The Network Contributor role is limited to the network resource group for network resource management.
       network-operators = {
         scope_key            = "network"
         role_definition_name = "Network Contributor"
@@ -529,8 +303,7 @@ locals {
         principal_type       = "Group"
         description          = "Network operators manage resources only in the network resource group"
       }
-      # Principal: optional security readers Entra group. Security Reader is
-      # limited to the security resource group for read-only security review.
+      # Principal: optional security readers Entra group. The Security Reader role is limited to the security resource group for read-only security review.
       security-readers = {
         scope_key            = "security"
         role_definition_name = "Security Reader"

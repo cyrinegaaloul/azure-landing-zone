@@ -3,12 +3,8 @@ locals {
   api_name  = "landing-zone-demo-api"
 
   endpoint_hostnames = {
-    gateway          = "${local.apim_name}.azure-api.net"
-    portal           = "${local.apim_name}.portal.azure-api.net"
-    developer_portal = "${local.apim_name}.developer.azure-api.net"
-    management       = "${local.apim_name}.management.azure-api.net"
-    scm              = "${local.apim_name}.scm.azure-api.net"
-  }
+  gateway = "${local.apim_name}.azure-api.net"
+}
 
   enabled_endpoint_hostnames = var.enable_apim ? local.endpoint_hostnames : {}
 }

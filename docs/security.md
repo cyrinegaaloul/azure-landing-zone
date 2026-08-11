@@ -9,7 +9,7 @@
 - `Key Vault Secrets User` scoped to the application vault.
 - Key Vault RBAC authorization, soft deletion, optional purge protection, and
   public access disabled when the private endpoint is active.
-- WAF_v2, explicit NSG paths/denies, Kubernetes NetworkPolicy, restricted Pod
+- WAF_v2, subnet NSGs with explicit application paths, Kubernetes NetworkPolicy, restricted Pod
   Security, and hardened non-root containers.
 - GitHub OIDC authentication with no Azure client secret or credentials JSON.
 

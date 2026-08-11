@@ -10,10 +10,13 @@
 | `appgw` | `10.10.3.0/24` | Dedicated Application Gateway v2 subnet. |
 | `apim` | `10.10.4.0/24` | Internal API Management subnet. |
 
-## Enforced application path
+## Application and platform paths
 
-Custom allows are evaluated before priority-4000 denies that override Azure's
-default `AllowVNetInBound` and `AllowVNetOutBound` rules.
+Each application layer has a dedicated subnet and NSG. Custom rules make the
+important application and Azure platform paths explicit. Azure's default
+`AllowVNetInBound`, `AllowVNetOutBound`, `AllowAzureLoadBalancerInBound`, and
+standard deny rules remain in place; the project does not override them with a
+custom deny-by-default east-west framework.
 
 | Source | Destination | Ports | Purpose |
 |---|---|---|---|
@@ -26,16 +29,16 @@ default `AllowVNetInBound` and `AllowVNetOutBound` rules.
 | AzureLoadBalancer | AKS subnet | TCP 30000-32767 | AKS service probes. |
 | AKS subnet | Private endpoints | TCP 443 | Private Key Vault access. |
 
-Self-subnet rules preserve Application Gateway scale-unit, APIM instance, and
-AKS node/Azure CNI communication. APIM also receives explicit outbound rules
-for its documented Azure dependencies: Internet HTTP, Storage HTTPS, SQL,
-Key Vault, Azure Monitor, and Azure-provided DNS. AKS retains HTTPS access for
-image pulls and Azure platform endpoints.
+APIM also receives explicit outbound rules for its documented Azure
+dependencies: Internet HTTP, Storage HTTPS, SQL, Key Vault, and Azure Monitor.
+AKS retains HTTPS access for image pulls and Azure platform endpoints. Azure's
+default VNet rules cover same-subnet traffic and Azure-provided DNS, avoiding
+wildcard custom rules and invalid `AzurePlatformDNS` allow rules.
 
-After approved paths, VNet inbound/outbound denies prevent arbitrary subnets
-from reaching App Gateway, APIM, AKS, or the Key Vault endpoint. Internet has no
-direct APIM or AKS listener. NSGs are stateful, so response traffic does not
-need mirrored rules.
+Internet has no direct APIM or AKS listener: APIM uses internal VNet mode and
+the Kubernetes Service is an internal LoadBalancer. Application Gateway is the
+only public frontend. NSGs are stateful, so response traffic does not need
+mirrored rules.
 
 ## Private endpoint DNS
 
