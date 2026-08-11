@@ -3,8 +3,8 @@ locals {
   api_name  = "landing-zone-demo-api"
 
   endpoint_hostnames = {
-  gateway = "${local.apim_name}.azure-api.net"
-}
+    gateway = "${local.apim_name}.azure-api.net"
+  }
 
   enabled_endpoint_hostnames = var.enable_apim ? local.endpoint_hostnames : {}
 }
