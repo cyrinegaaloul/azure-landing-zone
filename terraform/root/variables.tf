@@ -332,7 +332,7 @@ variable "aks_node_vm_size" {
 variable "aks_internal_load_balancer_ip" {
   description = "Static private IP reserved in the AKS subnet for the application's internal Kubernetes LoadBalancer"
   type        = string
-  default     = "10.10.2.10"
+  default     = "10.10.2.250"
 
   validation {
     condition     = can(cidrhost("${var.aks_internal_load_balancer_ip}/32", 0))

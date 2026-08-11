@@ -51,7 +51,7 @@ env: # define environment variables for all jobs
   TF_VAR_apim_sku_name: Developer_1
   TF_VAR_aks_node_count: 1
   TF_VAR_aks_node_vm_size: Standard_B2s_v2
-  TF_VAR_aks_internal_load_balancer_ip: 10.10.2.10
+  TF_VAR_aks_internal_load_balancer_ip: 10.10.2.250
   TF_VAR_aks_automatic_upgrade_channel: patch
   TF_VAR_aks_node_os_upgrade_channel: NodeImage
 

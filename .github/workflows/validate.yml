@@ -87,7 +87,7 @@ jobs:
             -TenantId '00000000-0000-0000-0000-000000000000' `
             -KeyVaultName 'kv-alz-dev-validation' `
             -ImageReference 'ghcr.io/example/landing-zone-demo-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' `
-            -BackendIp '10.10.2.10' `
+            -BackendIp '10.10.2.250' `
             -ApimSubnetCidr '10.10.4.0/24' `
             -AksSubnetCidr '10.10.2.0/24' `
             -PrivateEndpointSubnetCidr '10.10.1.0/24' `
