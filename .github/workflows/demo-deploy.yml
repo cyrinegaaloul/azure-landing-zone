@@ -113,6 +113,11 @@ jobs:
           KEY_VAULT_BOOTSTRAP_OBJECT_ID: ${{ vars.KEY_VAULT_BOOTSTRAP_PRINCIPAL_OBJECT_ID }}
           P4D_BACKEND_URL: ${{ vars.P4D_BACKEND_URL }}
         run: |
+          if [[ "$PROFILE" == "full" || "$PROFILE" == "secure" ]] && [[ -z "$AKS_DEPLOYER_OBJECT_ID" ]]; then
+            echo "AZURE_PRINCIPAL_OBJECT_ID must be configured as an Environment variable for full and secure deployments. Use the GitHub deployment identity's Microsoft Entra principal (object) ID, not its client ID."
+            exit 1
+          fi
+
           case "$PROFILE" in
             core)
               values="false false false false false true false false Detection"
@@ -164,9 +169,18 @@ jobs:
         shell: bash
         env:
           ACTION: ${{ inputs.action }}
+          PROFILE: ${{ inputs.profile }}
         run: |
           plan_args=(-input=false -out=tfplan)
-          if [[ "$ACTION" == "destroy" ]]; then plan_args+=(-destroy); fi
+          if [[ "$ACTION" == "destroy" ]]; then
+            plan_args+=(-destroy)
+          elif [[ "$PROFILE" == "full" || "$PROFILE" == "secure" ]]; then
+            # Internal-mode APIM exposes its management endpoint only to the VNet.
+            # GitHub-hosted runners cannot refresh it; saved-plan apply does not
+            # perform a second refresh. Move these jobs to an Azure-connected
+            # runner before relying on CI to detect APIM drift.
+            plan_args+=(-refresh=false)
+          fi
           terraform -chdir=terraform/root plan "${plan_args[@]}"
           terraform -chdir=terraform/root show -no-color tfplan > plan.txt
 
@@ -238,6 +252,7 @@ jobs:
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           P4D_BACKEND_URL: ${{ vars.P4D_BACKEND_URL }}
+          AKS_DEPLOYER_OBJECT_ID: ${{ vars.AZURE_PRINCIPAL_OBJECT_ID }}
         run: |
           $ErrorActionPreference = 'Stop'
           $repository = "ghcr.io/$($env:GITHUB_REPOSITORY_OWNER.ToLowerInvariant())/landing-zone-demo-frontend"
@@ -265,12 +280,32 @@ jobs:
           kubelogin convert-kubeconfig -l azurecli
 
           $authorized = $false
-          for ($attempt = 1; $attempt -le 12; $attempt++) {
-            kubectl auth can-i create deployments.apps --namespace demo --quiet
-            if ($LASTEXITCODE -eq 0) { $authorized = $true; break }
+          $maxAttempts = 60
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            Write-Host "Checking AKS Azure RBAC authorization ($attempt/$maxAttempts)..."
+            $canIResult = (& kubectl auth can-i create deployments.apps --namespace demo --request-timeout=20s 2>&1 | Out-String).Trim()
+            $canIExitCode = $LASTEXITCODE
+
+            if ($canIExitCode -eq 0 -and $canIResult -eq "yes") {
+              $authorized = $true
+              break
+            }
+
+            if ($attempt -eq 1 -or $attempt % 6 -eq 0) {
+              Write-Host "Authorization check result: $canIResult"
+              kubectl auth can-i get pods --namespace demo --request-timeout=20s
+            }
+
             Start-Sleep -Seconds 10
           }
-          if (-not $authorized) { throw 'AKS Azure RBAC authorization did not propagate within two minutes.' }
+          if (-not $authorized) {
+            Write-Host "Current Kubernetes context: $(kubectl config current-context)"
+            Write-Host "Azure RBAC assignments for the configured GitHub deployment principal:"
+            az role assignment list --assignee-object-id $env:AKS_DEPLOYER_OBJECT_ID --scope $workloads.aks_cluster.id --include-inherited --query "[].{role:roleDefinitionName,scope:scope,principal:principalId}" --output table
+            Write-Host "Effective Kubernetes permissions in namespace demo:"
+            kubectl auth can-i --list --namespace demo
+            throw 'AKS Azure RBAC authorization was not available within ten minutes. Confirm AZURE_PRINCIPAL_OBJECT_ID is the GitHub OIDC identity principal ID and has Azure Kubernetes Service RBAC Cluster Admin at the AKS cluster scope.'
+          }
 
           ./scripts/render-kubernetes.ps1 `
             -WorkloadIdentityClientId $workloads.workload_identity.client_id `
