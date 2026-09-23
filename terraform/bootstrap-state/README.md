@@ -10,7 +10,8 @@ landing-zone state that depends on these resources.
 - one Standard LRS StorageV2 account with shared keys disabled;
 - one private blob container with versioning and seven-day soft deletion;
 - one dedicated user-assigned managed identity for GitHub Actions;
-- two federated credentials for the `demo-plan` and `demo-apply` environments;
+- four federated credentials for `demo-dev-plan`, `demo-dev-apply`,
+  `demo-prod-plan`, and `demo-prod-apply`;
 - `Storage Blob Data Contributor` for the GitHub managed identity;
 - `Contributor` and `Role Based Access Control Administrator` for the GitHub
   managed identity at this subscription only;

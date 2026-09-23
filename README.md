@@ -123,7 +123,8 @@ terraform -chdir=terraform/root plan `
 
 The recommended deployment path is the manual `controlled-demo-deployment`
 workflow. It creates a saved plan, uploads it for review, and requires the
-`demo-apply` environment before applying the exact plan. Full deployments then:
+matching protected apply environment (`demo-dev-apply` or `demo-prod-apply`)
+before applying the exact plan. Full deployments then:
 
 1. resolve the CI-published SHA image to its immutable digest;
 2. obtain Terraform outputs without committing GUIDs or generated addresses;
@@ -148,7 +149,7 @@ The root state backend is separate and is not destroyed with the landing zone.
 
 ## Validation and image publication
 
-`validate-build-publish` runs on pull requests and pushes to `main`:
+`validate-build-publish` runs on pull requests and pushes to `dev` or `main`:
 
 - Terraform format, validation, and Trivy IaC scanning;
 - Python syntax and unit tests;

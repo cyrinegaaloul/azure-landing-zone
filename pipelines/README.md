@@ -7,7 +7,7 @@ validation, so an image cannot bypass the checks that evaluated it.
 
 | Workflow | Trigger | Function |
 |---|---|---|
-| `validate-build-publish` | Pull request and push to `main` | Validate code/configuration, build once, scan, generate an SBOM, and publish the exact SHA image only on `main`. |
+| `validate-build-publish` | Pull request and push to `dev` or `main` | Validate code/configuration, build once, scan, generate an SBOM, and publish the exact SHA images on `dev` and `main`. |
 | `controlled-demo-deployment` | Manual dispatch from `dev` or `main` | Selects the matching dev/prod target, plans against persistent state, optionally applies the reviewed plan, renders frontend deployment values, and smoke-tests. |
 
 ### CI gate
@@ -28,7 +28,7 @@ misconfigurations fail their gates.
 
 Workflow concurrency prevents simultaneous state operations. `plan` produces a
 saved plan and a readable plan artifact. `apply` and `destroy` generate the
-saved plan in the same run, pause at the protected `demo-apply` environment,
+saved plan in the same run, pause at the protected apply environment,
 then apply that exact binary plan. Pull requests never deploy.
 
 Full/secure apply also:
@@ -51,10 +51,19 @@ deployment while access is unavailable. See [P4D integration](../docs/p4d-integr
 
 ## GitHub configuration
 
-Create protected environments `demo-plan` and `demo-apply`. Require a reviewer
-for `demo-apply`.
+Create these GitHub Environments. Require a reviewer for each apply environment:
 
-Repository/environment secrets:
+| Deployment target | Plan environment | Apply environment |
+|---|---|---|
+| Development (`dev` branch) | `demo-dev-plan` | `demo-dev-apply` |
+| Production (`main` branch) | `demo-prod-plan` | `demo-prod-apply` |
+
+The workflow's branch guard permits development deployment only from `dev` and
+production deployment only from `main`.
+
+Configure these secrets in **each** of the four environments above. They may
+have the same values when both targets intentionally use one Azure deployment
+identity and subscription; use environment-specific values when they do not.
 
 | Name | Value |
 |---|---|
@@ -62,22 +71,41 @@ Repository/environment secrets:
 | `AZURE_TENANT_ID` | Microsoft Entra tenant ID. |
 | `AZURE_SUBSCRIPTION_ID` | Target Azure subscription ID. |
 
-Repository/environment variables:
+Configure these variables in **each** of the four environments:
 
 | Name | Required | Value |
 |---|---:|---|
 | `TFSTATE_RESOURCE_GROUP` | Yes | Backend resource group name. |
 | `TFSTATE_STORAGE_ACCOUNT` | Yes | Backend storage account name. |
 | `TFSTATE_CONTAINER` | Yes | `tfstate`. |
-| `TFSTATE_KEY` | Yes | `development/azure-landing-zone.tfstate`. |
+| `TFSTATE_KEY` | Yes | See the per-environment state table below. |
 | `AZURE_PRINCIPAL_OBJECT_ID` | Full profile | Principal ID, not client ID, of the GitHub deployment managed identity for AKS RBAC. |
 | `PLATFORM_ADMIN_GROUP_OBJECT_ID` | Optional | Platform administrators Entra group object ID. |
 | `NETWORK_OPERATOR_GROUP_OBJECT_ID` | Optional | Network operators Entra group object ID. |
 | `SECURITY_READER_GROUP_OBJECT_ID` | Optional | Security readers Entra group object ID. |
 | `KEY_VAULT_BOOTSTRAP_PRINCIPAL_OBJECT_ID` | Bootstrap only | Human object ID temporarily granted Key Vault Secrets Officer. |
+| `P4D_BACKEND_URL` | Optional | HTTPS URL for the P4D backend APIM route. |
+
+### State configuration: required separation
+
+`TFSTATE_RESOURCE_GROUP`, `TFSTATE_STORAGE_ACCOUNT`, `TFSTATE_CONTAINER`, and
+`TFSTATE_KEY` must be identical within a plan/apply pair so the reviewed plan
+and apply use the same state. `TFSTATE_KEY` must differ between development and
+production, even if both use the same storage account and container.
+
+| GitHub Environment | `TFSTATE_KEY` example |
+|---|---|
+| `demo-dev-plan` | `development/azure-landing-zone.tfstate` |
+| `demo-dev-apply` | `development/azure-landing-zone.tfstate` |
+| `demo-prod-plan` | `production/azure-landing-zone.tfstate` |
+| `demo-prod-apply` | `production/azure-landing-zone.tfstate` |
+
+Set the remaining three backend variables to the intended backend for each
+target. A separate storage account is optional, but use one if organizational
+isolation requires it. Do not reuse the development key for production.
 
 The bootstrap configuration creates the dedicated GitHub user-assigned managed
-identity, `demo-plan`/`demo-apply` federated credentials, and its backend and
+identity, federated credentials for all four environments, and its backend and
 deployment RBAC assignments. Copy the bootstrap outputs once into the settings
 above. No app registration, client secret, or `AZURE_CREDENTIALS` is required.
 

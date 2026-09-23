@@ -5,8 +5,10 @@ locals {
   common_tags          = merge(var.tags, { environment = var.environment })
 
   github_oidc_subjects = {
-    demo-plan  = "repo:cyrinegaaloul/azure-landing-zone:environment:demo-plan"
-    demo-apply = "repo:cyrinegaaloul/azure-landing-zone:environment:demo-apply"
+    demo-dev-plan   = "repo:cyrinegaaloul/azure-landing-zone:environment:demo-dev-plan"
+    demo-dev-apply  = "repo:cyrinegaaloul/azure-landing-zone:environment:demo-dev-apply"
+    demo-prod-plan  = "repo:cyrinegaaloul/azure-landing-zone:environment:demo-prod-plan"
+    demo-prod-apply = "repo:cyrinegaaloul/azure-landing-zone:environment:demo-prod-apply"
   }
 
   subscription_scope = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
