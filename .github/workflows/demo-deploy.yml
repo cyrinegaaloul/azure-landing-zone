@@ -336,7 +336,51 @@ jobs:
             throw "AKS Application Routing controller did not become available within ten minutes. Review the controller diagnostics above."
           }
           kubectl apply -k monitoring
-          kubectl rollout status deployment/landing-zone-demo-frontend --namespace demo --timeout 10m
+
+          function Show-FrontendRolloutDiagnostics {
+            Write-Host "Frontend rollout diagnostics:"
+            kubectl get deployment landing-zone-demo-frontend --namespace demo -o wide
+            kubectl get pods --namespace demo -l app=landing-zone-demo-frontend -o wide
+            kubectl describe deployment landing-zone-demo-frontend --namespace demo
+            kubectl get pods --namespace demo -l app=landing-zone-demo-frontend -o name | ForEach-Object {
+              kubectl describe $_ --namespace demo
+              kubectl logs $_ --namespace demo --all-containers --tail=200
+            }
+            kubectl get events --namespace demo --sort-by=.lastTimestamp
+          }
+
+          kubectl rollout status deployment/landing-zone-demo-frontend --namespace demo --timeout 5m
+          if ($LASTEXITCODE -ne 0) {
+            Show-FrontendRolloutDiagnostics
+
+            # A completed replacement may be blocked solely by an old pod whose
+            # deletion is stuck on a node. It is no longer selected by the new
+            # ReplicaSet, so remove only pods already marked for deletion and
+            # retry the rollout once.
+            $terminatingPods = @(
+              (kubectl get pods --namespace demo -l app=landing-zone-demo-frontend -o json | ConvertFrom-Json).items |
+                Where-Object { $_.metadata.deletionTimestamp } |
+                ForEach-Object { $_.metadata.name }
+            )
+
+            if ($terminatingPods.Count -eq 0) {
+              throw "Frontend rollout did not complete and no terminating pod was found for safe recovery. Review the diagnostics above."
+            }
+
+            foreach ($pod in $terminatingPods) {
+              Write-Host "Force-removing stale terminating pod $pod before retrying the rollout."
+              kubectl delete pod $pod --namespace demo --grace-period=0 --force --wait=true
+              if ($LASTEXITCODE -ne 0) {
+                throw "Unable to remove stale terminating pod $pod. Review the diagnostics above."
+              }
+            }
+
+            kubectl rollout status deployment/landing-zone-demo-frontend --namespace demo --timeout 5m
+            if ($LASTEXITCODE -ne 0) {
+              Show-FrontendRolloutDiagnostics
+              throw "Frontend rollout did not complete after stale terminating pods were removed."
+            }
+          }
 
           $ingressReady = $false
           for ($attempt = 1; $attempt -le 60; $attempt++) {
@@ -355,7 +399,21 @@ jobs:
           }
 
           kubectl get podmonitor landing-zone-demo-frontend --namespace demo
-          kubectl exec deployment/landing-zone-demo-frontend --namespace demo -- python -c "import urllib.request; assert b'demo_app_http_requests_total' in urllib.request.urlopen('http://127.0.0.1:8080/metrics').read()"
+          $readyFrontendPod = (
+            (kubectl get pods --namespace demo -l app=landing-zone-demo-frontend -o json | ConvertFrom-Json).items |
+              Where-Object {
+                $_.status.phase -eq 'Running' -and
+                ($_.status.containerStatuses | Where-Object { $_.name -eq 'landing-zone-demo-frontend' -and $_.ready }).Count -eq 1
+              } |
+              Select-Object -First 1
+          ).metadata.name
+          if (-not $readyFrontendPod) {
+            throw 'No ready frontend pod was available for the metrics smoke test.'
+          }
+          kubectl exec $readyFrontendPod --namespace demo -- python -c "import urllib.request; assert b'demo_app_http_requests_total' in urllib.request.urlopen('http://127.0.0.1:8080/metrics').read()"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Frontend metrics smoke test failed on pod $readyFrontendPod."
+          }
 
       - name: P4D backend deployment interface (awaiting access)
         if: inputs.action == 'apply' && (inputs.profile == 'full' || inputs.profile == 'secure')
