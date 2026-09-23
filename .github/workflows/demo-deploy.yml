@@ -56,7 +56,10 @@ env: # define environment variables for all jobs
   TF_VAR_resource_group_locks: '{}'
   TF_VAR_enable_management_access: false
   TF_VAR_apim_sku_name: Developer_1
-  TF_VAR_aks_node_count: 1
+  # AKS system services plus the managed Application Routing controller require
+  # more allocatable CPU than a single Standard_B2s_v2 node provides. The
+  # controller runs two replicas, each requesting 500m CPU.
+  TF_VAR_aks_node_count: 2
   TF_VAR_aks_node_vm_size: Standard_B2s_v2
   TF_VAR_aks_internal_load_balancer_ip: 10.10.2.250
   TF_VAR_aks_automatic_upgrade_channel: patch

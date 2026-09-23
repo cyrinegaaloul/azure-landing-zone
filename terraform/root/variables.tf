@@ -318,9 +318,9 @@ variable "enable_aks_demo" {
 }
 
 variable "aks_node_count" {
-  description = "AKS node count"
+  description = "AKS system-pool node count; use at least two nodes for the managed Application Routing controller"
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "aks_node_vm_size" {

@@ -41,7 +41,7 @@ variable "aks_subnet_id" {
 
 variable "aks_node_count" {
   type    = number
-  default = 1
+  default = 2
 }
 
 variable "aks_node_vm_size" {

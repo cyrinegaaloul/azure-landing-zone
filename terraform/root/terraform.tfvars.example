@@ -71,7 +71,7 @@ enable_management_access = false
 waf_policy_mode = "Detection"
 apim_sku_name   = "Developer_1"
 
-aks_node_count                     = 1
+aks_node_count                     = 2 # Required to schedule both managed Application Routing replicas alongside AKS system pods.
 aks_node_vm_size                   = "Standard_B2s_v2"
 aks_internal_load_balancer_ip       = "10.10.2.250" # Reserved for the internal ingress controller.
 aks_api_server_authorized_ip_ranges = []
