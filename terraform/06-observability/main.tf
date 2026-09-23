@@ -44,3 +44,15 @@ resource "azurerm_role_assignment" "grafana_monitoring_data_reader" {
   principal_id         = azurerm_dashboard_grafana.this[0].identity[0].principal_id
   principal_type       = "ServicePrincipal"
 }
+
+# Platform administrators administer dashboards and data sources only on this
+# Grafana instance. The assignment is conditional so environments without an
+# approved platform-admin group receive no broad Grafana access by default.
+resource "azurerm_role_assignment" "grafana_platform_admin" {
+  count = var.enabled && var.platform_admin_group_object_id != null ? 1 : 0
+
+  scope                = azurerm_dashboard_grafana.this[0].id
+  role_definition_name = "Grafana Admin"
+  principal_id         = var.platform_admin_group_object_id
+  principal_type       = "Group"
+}

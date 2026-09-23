@@ -32,7 +32,9 @@ AKS pods and Kubernetes metrics
 Terraform creates the Azure Monitor Workspace, enables the AKS managed metrics
 integration, creates Azure Managed Grafana, links the workspace, and grants the
 Grafana system-assigned identity `Monitoring Data Reader` on that workspace
-only. No Prometheus server, Grafana deployment, persistent volume, or Grafana
+only. When `PLATFORM_ADMIN_GROUP_OBJECT_ID` is configured, that Microsoft Entra
+group receives the scoped `Grafana Admin` role on the managed Grafana instance.
+No Prometheus server, Grafana deployment, persistent volume, or Grafana
 port-forward exists in AKS.
 
 `monitoring/podmonitor.yaml` preserves collection of the frontend `/metrics`

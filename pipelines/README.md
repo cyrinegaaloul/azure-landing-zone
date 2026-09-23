@@ -80,7 +80,7 @@ Configure these variables in **each** of the four environments:
 | `TFSTATE_CONTAINER` | Yes | `tfstate`. |
 | `TFSTATE_KEY` | Yes | See the per-environment state table below. |
 | `AZURE_PRINCIPAL_OBJECT_ID` | Full profile | Principal ID, not client ID, of the GitHub deployment managed identity for AKS RBAC. |
-| `PLATFORM_ADMIN_GROUP_OBJECT_ID` | Optional | Platform administrators Entra group object ID. |
+| `PLATFORM_ADMIN_GROUP_OBJECT_ID` | Full profile | Platform administrators Entra group object ID. The group receives scoped Azure Managed Grafana Administrator access and AKS RBAC cluster administration. |
 | `NETWORK_OPERATOR_GROUP_OBJECT_ID` | Optional | Network operators Entra group object ID. |
 | `SECURITY_READER_GROUP_OBJECT_ID` | Optional | Security readers Entra group object ID. |
 | `KEY_VAULT_BOOTSTRAP_PRINCIPAL_OBJECT_ID` | Bootstrap only | Human object ID temporarily granted Key Vault Secrets Officer. |

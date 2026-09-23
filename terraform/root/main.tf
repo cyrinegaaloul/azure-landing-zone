@@ -406,6 +406,7 @@ module "observability" {
   resource_group_name = module.foundation.resource_groups.foundation.name
   common_tags         = module.foundation.common_tags
   enabled             = var.enable_aks_demo
+  platform_admin_group_object_id = var.platform_admin_group_object_id
 }
 
 resource "azurerm_role_assignment" "aks_subnet_network_contributor" {
