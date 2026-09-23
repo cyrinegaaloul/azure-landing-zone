@@ -101,7 +101,7 @@ jobs:
           kubeconform
           -strict
           -summary
-          -skip 'SecretProviderClass|NginxIngressController'
+          -skip 'SecretProviderClass,NginxIngressController'
           "$RUNNER_TEMP/rendered-manifests.yaml"
 
       - name: Set up Trivy
