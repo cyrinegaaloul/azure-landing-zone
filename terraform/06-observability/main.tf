@@ -20,7 +20,7 @@ resource "azurerm_dashboard_grafana" "this" {
   resource_group_name           = var.resource_group_name
   api_key_enabled               = false
   public_network_access_enabled = true
-  grafana_major_version         = "11"
+  grafana_major_version         = "12"
   sku                           = "Standard"
 
   identity {
