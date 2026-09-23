@@ -349,33 +349,37 @@ jobs:
             kubectl get events --namespace demo --sort-by=.lastTimestamp
           }
 
-          kubectl rollout status deployment/landing-zone-demo-frontend --namespace demo --timeout 5m
-          if ($LASTEXITCODE -ne 0) {
-            Show-FrontendRolloutDiagnostics
-
-            # A completed replacement may be blocked solely by an old pod whose
-            # deletion is stuck on a node. It is no longer selected by the new
-            # ReplicaSet, so remove only pods already marked for deletion and
-            # retry the rollout once.
+          function Remove-StaleTerminatingFrontendPods {
             $terminatingPods = @(
               (kubectl get pods --namespace demo -l app=landing-zone-demo-frontend -o json | ConvertFrom-Json).items |
                 Where-Object { $_.metadata.deletionTimestamp } |
                 ForEach-Object { $_.metadata.name }
             )
 
-            if ($terminatingPods.Count -eq 0) {
-              throw "Frontend rollout did not complete and no terminating pod was found for safe recovery. Review the diagnostics above."
-            }
-
             foreach ($pod in $terminatingPods) {
-              Write-Host "Force-removing stale terminating pod $pod before retrying the rollout."
+              # The Deployment has already created the replacement before this
+              # point. Limit force deletion to a pod Kubernetes itself has
+              # marked for deletion, never a currently serving pod.
+              Write-Host "Force-removing stale terminating pod $pod."
               kubectl delete pod $pod --namespace demo --grace-period=0 --force --wait=true
               if ($LASTEXITCODE -ne 0) {
-                throw "Unable to remove stale terminating pod $pod. Review the diagnostics above."
+                throw "Unable to remove stale terminating pod $pod."
               }
             }
 
-            kubectl rollout status deployment/landing-zone-demo-frontend --namespace demo --timeout 5m
+            return $terminatingPods.Count
+          }
+
+          # Remove a stale pod immediately instead of waiting for the
+          # Deployment's progress deadline on every repeat run.
+          [void](Remove-StaleTerminatingFrontendPods)
+          kubectl rollout status deployment/landing-zone-demo-frontend --namespace demo --timeout 5m
+          if ($LASTEXITCODE -ne 0) {
+            Show-FrontendRolloutDiagnostics
+
+            [void](Remove-StaleTerminatingFrontendPods)
+
+            kubectl rollout status deployment/landing-zone-demo-frontend --namespace demo --timeout 3m
             if ($LASTEXITCODE -ne 0) {
               Show-FrontendRolloutDiagnostics
               throw "Frontend rollout did not complete after stale terminating pods were removed."
