@@ -39,3 +39,8 @@ output "workloads" {
     application_backend_url = module.workloads.application_backend_url
   }
 }
+
+output "observability" {
+  description = "Azure-managed Prometheus and Grafana resources when AKS is enabled"
+  value       = module.observability.resources
+}

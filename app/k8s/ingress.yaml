@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: landing-zone-demo-frontend
+  namespace: demo
+  labels:
+    app: landing-zone-demo-frontend
+spec:
+  ingressClassName: alz-internal
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: landing-zone-demo-frontend
+                port:
+                  number: 80

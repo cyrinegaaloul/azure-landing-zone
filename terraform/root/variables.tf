@@ -330,7 +330,7 @@ variable "aks_node_vm_size" {
 }
 
 variable "aks_internal_load_balancer_ip" {
-  description = "Static private IP reserved in the AKS subnet for the application's internal Kubernetes LoadBalancer"
+  description = "Static private IP reserved in the AKS subnet for the internal Application Routing ingress controller"
   type        = string
   default     = "10.10.2.250"
 
@@ -368,4 +368,16 @@ variable "aks_node_os_upgrade_channel" {
   description = "AKS node operating-system upgrade channel"
   type        = string
   default     = "NodeImage"
+}
+
+variable "p4d_backend_url" {
+  description = "Optional P4D backend HTTP(S) URL used to create APIM /backend routing after access details are confirmed"
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.p4d_backend_url == null || startswith(var.p4d_backend_url, "http://") || startswith(var.p4d_backend_url, "https://")
+    error_message = "p4d_backend_url must be null or an HTTP(S) URL."
+  }
 }

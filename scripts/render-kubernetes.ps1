@@ -9,6 +9,7 @@ param(
     [Parameter(Mandatory)] [string] $ApimSubnetCidr,
     [Parameter(Mandatory)] [string] $AksSubnetCidr,
     [Parameter(Mandatory)] [string] $PrivateEndpointSubnetCidr,
+    [Parameter()] [string] $BackendApiUrl = '',
     [Parameter(Mandatory)] [string] $OutputPath
 )
 
@@ -24,15 +25,16 @@ $replacements = [ordered]@{
     'REPLACE_WITH_TENANT_ID'                  = $TenantId
     'REPLACE_WITH_KEY_VAULT_NAME'             = $KeyVaultName
     'REPLACE_WITH_IMAGE_REFERENCE'            = $ImageReference
-    'REPLACE_WITH_AKS_BACKEND_IP'             = $BackendIp
+    'REPLACE_WITH_AKS_BACKEND_IP'              = $BackendIp
     'REPLACE_WITH_AKS_SUBNET_NAME'             = $AksSubnetName
     'REPLACE_WITH_APIM_SUBNET_CIDR'            = $ApimSubnetCidr
     'REPLACE_WITH_AKS_SUBNET_CIDR'             = $AksSubnetCidr
     'REPLACE_WITH_PRIVATE_ENDPOINT_SUBNET_CIDR' = $PrivateEndpointSubnetCidr
+    'REPLACE_WITH_BACKEND_API_URL'              = $BackendApiUrl
 }
 
 foreach ($replacement in $replacements.GetEnumerator()) {
-    if ([string]::IsNullOrWhiteSpace($replacement.Value)) {
+    if ([string]::IsNullOrWhiteSpace($replacement.Value) -and $replacement.Key -ne 'REPLACE_WITH_BACKEND_API_URL') {
         throw "A value for $($replacement.Key) is required."
     }
     $rendered = $rendered.Replace($replacement.Key, $replacement.Value)

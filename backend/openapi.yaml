@@ -1,0 +1,24 @@
+openapi: 3.0.3
+info:
+  title: Landing Zone P4D Backend API
+  version: 1.0.0
+  description: Portable backend API intended for P4D deployment.
+paths:
+  /health:
+    get:
+      summary: Check backend health
+      responses:
+        "200":
+          description: Backend is healthy.
+  /api/info:
+    get:
+      summary: Get backend information
+      responses:
+        "200":
+          description: Backend information.
+  /api/items:
+    get:
+      summary: List backend demo data
+      responses:
+        "200":
+          description: Backend data.

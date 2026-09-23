@@ -50,6 +50,18 @@ resource "azurerm_kubernetes_cluster" "aks" {
     secret_rotation_enabled = false
   }
 
+  # AKS Application Routing is the supported AKS-managed NGINX implementation.
+  # The default controller is disabled because the deployment manifest creates
+  # one internal controller with the APIM-reserved private IP.
+  web_app_routing {
+    dns_zone_ids             = []
+    default_nginx_controller = "None"
+  }
+
+  # Enables the Azure Monitor metrics agent. The workspace association is
+  # applied below through AzAPI because AzureRM 4.x does not model it.
+  monitor_metrics {}
+
   network_profile {
     network_plugin    = "azure"
     network_policy    = "azure"
@@ -57,6 +69,24 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 
   tags = var.common_tags
+}
+
+resource "azapi_update_resource" "aks_managed_prometheus" {
+  count = var.enable_aks_demo ? 1 : 0
+
+  type        = "Microsoft.ContainerService/managedClusters@2024-10-01"
+  resource_id = azurerm_kubernetes_cluster.aks[0].id
+
+  body = {
+    properties = {
+      azureMonitorProfile = {
+        metrics = {
+          enabled                         = true
+          azureMonitorWorkspaceResourceId = var.azure_monitor_workspace_id
+        }
+      }
+    }
+  }
 }
 
 resource "azurerm_role_assignment" "cluster_admin" {

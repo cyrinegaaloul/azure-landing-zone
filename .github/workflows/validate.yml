@@ -3,6 +3,7 @@ name: validate-build-publish
 on:
   push:
     branches:
+      - dev
       - main
   pull_request:
 
@@ -86,16 +87,17 @@ jobs:
             -WorkloadIdentityClientId '00000000-0000-0000-0000-000000000000' `
             -TenantId '00000000-0000-0000-0000-000000000000' `
             -KeyVaultName 'kv-alz-dev-validation' `
-            -ImageReference 'ghcr.io/example/landing-zone-demo-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' `
+            -ImageReference 'ghcr.io/example/landing-zone-demo-frontend@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' `
             -BackendIp '10.10.2.250' `
             -AksSubnetName 'snet-aks-alz-dev' `
             -ApimSubnetCidr '10.10.4.0/24' `
             -AksSubnetCidr '10.10.2.0/24' `
             -PrivateEndpointSubnetCidr '10.10.1.0/24' `
+            -BackendApiUrl '' `
             -OutputPath '${{ runner.temp }}/rendered-manifests.yaml'
 
       - name: Validate Kubernetes manifests
-        run: kubeconform -strict -summary -skip SecretProviderClass "$RUNNER_TEMP/rendered-manifests.yaml"
+        run: kubeconform -strict -summary -skip SecretProviderClass -skip NginxIngressController "$RUNNER_TEMP/rendered-manifests.yaml"
 
       - name: Set up Trivy
         uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514 # v0.2.6
@@ -109,7 +111,7 @@ jobs:
       - name: Render and validate monitoring configuration
         run: |
           kubectl kustomize monitoring > "$RUNNER_TEMP/rendered-monitoring.yaml"
-          kubeconform -strict -summary -skip ServiceMonitor "$RUNNER_TEMP/rendered-monitoring.yaml"
+          kubeconform -strict -summary -skip PodMonitor "$RUNNER_TEMP/rendered-monitoring.yaml"
           trivy config --format table --severity HIGH,CRITICAL --exit-code 1 "$RUNNER_TEMP/rendered-monitoring.yaml"
 
       - name: Validate repository YAML and JSON syntax
@@ -120,11 +122,26 @@ jobs:
       - name: Set immutable image name
         shell: bash
         run: |
-          echo "IMAGE_REPOSITORY=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/landing-zone-demo-app" >> "$GITHUB_ENV"
-          echo "IMAGE_REFERENCE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/landing-zone-demo-app:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "IMAGE_REPOSITORY=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/landing-zone-demo-frontend" >> "$GITHUB_ENV"
+          echo "IMAGE_REFERENCE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/landing-zone-demo-frontend:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
       - name: Build Docker image once
         run: docker build --tag "$IMAGE_REFERENCE" ./app
+
+      - name: Build backend image
+        run: docker build --tag "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/landing-zone-demo-backend:${GITHUB_SHA}" ./backend
+
+      - name: Report backend HIGH and CRITICAL image vulnerabilities
+        run: trivy image --scanners vuln --format table --severity HIGH,CRITICAL --exit-code 0 "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/landing-zone-demo-backend:${GITHUB_SHA}"
+
+      - name: Block fixable backend HIGH and CRITICAL image vulnerabilities
+        run: trivy image --scanners vuln --format table --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/landing-zone-demo-backend:${GITHUB_SHA}"
+
+      - name: Validate backend Python code
+        working-directory: backend
+        run: |
+          python -m py_compile server.py test_server.py
+          python -m unittest -v
 
       - name: Report HIGH and CRITICAL image vulnerabilities
         run: trivy image --scanners vuln --format table --severity HIGH,CRITICAL --exit-code 0 "$IMAGE_REFERENCE"
@@ -148,5 +165,9 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
 
       - name: Push the scanned image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
         run: docker push "$IMAGE_REFERENCE"
+
+      - name: Push the scanned backend image
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+        run: docker push "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/landing-zone-demo-backend:${GITHUB_SHA}"

@@ -8,7 +8,7 @@ validation, so an image cannot bypass the checks that evaluated it.
 | Workflow | Trigger | Function |
 |---|---|---|
 | `validate-build-publish` | Pull request and push to `main` | Validate code/configuration, build once, scan, generate an SBOM, and publish the exact SHA image only on `main`. |
-| `controlled-demo-deployment` | Manual dispatch from `main` | Plan against persistent state, optionally apply the reviewed plan, render deployment values, deploy, and smoke-test. |
+| `controlled-demo-deployment` | Manual dispatch from `dev` or `main` | Selects the matching dev/prod target, plans against persistent state, optionally applies the reviewed plan, renders frontend deployment values, and smoke-tests. |
 
 ### CI gate
 
@@ -16,11 +16,13 @@ The validation order is Terraform formatting/validation, Terraform Trivy scan,
 Python tests, Kustomize/kubeconform, Kubernetes Trivy scan, YAML/JSON parsing,
 Docker build, image scan, SBOM generation, and conditional push.
 
-The image is tagged `ghcr.io/<owner>/landing-zone-demo-app:<git-sha>`. It is
-built once and scanned locally before `docker push`. Pull requests have no
-publish step. HIGH/CRITICAL vulnerabilities are reported; fixable
-HIGH/CRITICAL vulnerabilities fail the image gate. Terraform and Kubernetes
-HIGH/CRITICAL misconfigurations fail their gates.
+The frontend and backend images are tagged
+`ghcr.io/<owner>/landing-zone-demo-frontend:<git-sha>` and
+`ghcr.io/<owner>/landing-zone-demo-backend:<git-sha>`. Both are built and
+scanned locally before publication. Pull requests have no publish step.
+HIGH/CRITICAL vulnerabilities are reported; fixable HIGH/CRITICAL
+vulnerabilities fail the image gate. Terraform and Kubernetes HIGH/CRITICAL
+misconfigurations fail their gates.
 
 ### Controlled deployment
 
@@ -34,9 +36,18 @@ Full/secure apply also:
 - pulls the image for the selected commit and resolves its registry digest;
 - reads AKS, identity, network, Key Vault, and edge Terraform outputs;
 - renders an untracked manifest with `scripts/render-kubernetes.ps1`;
-- installs `kube-prometheus-stack` chart `86.0.1` and applies monitoring config;
+- verifies Terraform-created Azure Monitor Workspace and Azure Managed Grafana,
+  applies the managed-Prometheus `PodMonitor`, and validates `/metrics`;
 - applies the rendered application, waits for rollout, and smoke-tests
   `http://<application-gateway-ip>/demo/health`.
+
+## Frontend and P4D backend preparation
+
+The `dev` branch is prepared for `target_environment=dev`; `main` is prepared
+for `target_environment=prod`. CI builds, scans, and publishes separate
+frontend and backend images. The controlled workflow deploys the frontend to
+AKS only. It has an explicit P4D integration boundary and does not fake a P4D
+deployment while access is unavailable. See [P4D integration](../docs/p4d-integration.md).
 
 ## GitHub configuration
 

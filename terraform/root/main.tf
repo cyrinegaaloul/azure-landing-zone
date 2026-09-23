@@ -374,19 +374,20 @@ module "security_baseline" {
 module "workloads" {
   source = "../04-workloads"
 
-  location               = module.foundation.location
-  project_name           = var.project_name
-  environment            = var.environment
-  resource_group_name    = module.foundation.resource_groups.foundation.name
-  common_tags            = module.foundation.common_tags
-  enable_aks_demo        = var.enable_aks_demo
-  enable_key_vault       = var.enable_key_vault
-  key_vault_id           = var.enable_key_vault ? module.security_baseline.key_vault.id : null
-  aks_subnet_id          = module.networking.subnets["aks"].id
-  aks_node_count         = var.aks_node_count
-  aks_node_vm_size       = var.aks_node_vm_size
-  application_backend_ip = var.aks_internal_load_balancer_ip
-  tenant_id              = var.tenant_id
+  location                   = module.foundation.location
+  project_name               = var.project_name
+  environment                = var.environment
+  resource_group_name        = module.foundation.resource_groups.foundation.name
+  common_tags                = module.foundation.common_tags
+  enable_aks_demo            = var.enable_aks_demo
+  enable_key_vault           = var.enable_key_vault
+  key_vault_id               = var.enable_key_vault ? module.security_baseline.key_vault.id : null
+  aks_subnet_id              = module.networking.subnets["aks"].id
+  aks_node_count             = var.aks_node_count
+  aks_node_vm_size           = var.aks_node_vm_size
+  application_backend_ip     = var.aks_internal_load_balancer_ip
+  azure_monitor_workspace_id = module.observability.azure_monitor_workspace.id
+  tenant_id                  = var.tenant_id
   cluster_admin_principal_ids = toset(compact([
     var.platform_admin_group_object_id,
     var.aks_deployer_principal_object_id
@@ -396,12 +397,23 @@ module "workloads" {
   node_os_upgrade_channel         = var.aks_node_os_upgrade_channel
 }
 
+module "observability" {
+  source = "../06-observability"
+
+  location            = module.foundation.location
+  project_name        = var.project_name
+  environment         = var.environment
+  resource_group_name = module.foundation.resource_groups.foundation.name
+  common_tags         = module.foundation.common_tags
+  enabled             = var.enable_aks_demo
+}
+
 resource "azurerm_role_assignment" "aks_subnet_network_contributor" {
   count = var.enable_aks_demo ? 1 : 0
 
   # Principal: AKS system-assigned control-plane identity.
   # Scope/purpose: Network Contributor on the AKS subnet so the Azure cloud
-  # provider can create and manage the application's internal LoadBalancer.
+  # provider can create and manage the internal Application Routing controller.
   scope                            = module.networking.subnets["aks"].id
   role_definition_name             = "Network Contributor"
   principal_id                     = module.workloads.aks_cluster.identity_principal_id
@@ -412,18 +424,20 @@ resource "azurerm_role_assignment" "aks_subnet_network_contributor" {
 module "apim" {
   source = "../05-apim"
 
-  location            = module.foundation.location
-  resource_group_name = module.foundation.resource_groups.network.name
-  project_name        = var.project_name
-  environment         = var.environment
-  owner               = var.owner
-  tags                = module.foundation.common_tags
-  enable_apim         = var.enable_apim
-  apim_sku_name       = var.apim_sku_name
-  apim_subnet_id      = module.networking.subnets["apim"].id
-  virtual_network_id  = module.networking.virtual_network.id
-  backend_url         = module.workloads.application_backend_url
-  openapi_spec_path   = "${path.root}/../../app/openapi.yaml"
+  location              = module.foundation.location
+  resource_group_name   = module.foundation.resource_groups.network.name
+  project_name          = var.project_name
+  environment           = var.environment
+  owner                 = var.owner
+  tags                  = module.foundation.common_tags
+  enable_apim           = var.enable_apim
+  apim_sku_name         = var.apim_sku_name
+  apim_subnet_id        = module.networking.subnets["apim"].id
+  virtual_network_id    = module.networking.virtual_network.id
+  backend_url           = module.workloads.application_backend_url
+  p4d_backend_url       = var.p4d_backend_url
+  openapi_spec_path     = "${path.root}/../../app/openapi.yaml"
+  p4d_openapi_spec_path = "${path.root}/../../backend/openapi.yaml"
 
   depends_on = [module.networking]
 }

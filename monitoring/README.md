@@ -1,30 +1,21 @@
 # Monitoring
 
-This directory configures an in-cluster, open-source monitoring stack. It does
-not use Azure Log Analytics or an external monitoring service.
+This directory contains the application scrape configuration and dashboard for
+Azure Monitor managed service for Prometheus. Prometheus and Grafana are Azure
+managed services; neither runs as a Kubernetes Pod.
 
 | File | Purpose |
 |---|---|
-| `kube-prometheus-stack-values.yaml` | Cost-conscious Prometheus/Grafana Helm values. |
-| `servicemonitor.yaml` | Scrapes the demo Service `/metrics` endpoint every 30 seconds. |
+| `podmonitor.yaml` | Azure Monitor metrics-agent CRD that scrapes application `/metrics` every 30 seconds. |
 | `grafana-dashboard.json` | Request rate, errors, latency, CPU, memory, uptime, and replicas. |
-| `kustomization.yaml` | Applies the ServiceMonitor and provisions the dashboard ConfigMap. |
+| `kustomization.yaml` | Applies the managed-Prometheus scrape configuration. |
 
-The Grafana sidecar watches ConfigMaps labelled `grafana_dashboard=1`, so the
-dashboard is provisioned automatically. Prometheus discovers ServiceMonitors
-across namespaces. NetworkPolicy explicitly permits monitoring-namespace
-scrapes to the application.
+The AKS Azure Monitor metrics agent discovers the `PodMonitor` and sends the
+metrics to the Terraform-created Azure Monitor Workspace. Import
+`grafana-dashboard.json` in Azure Managed Grafana and choose its Azure Monitor
+Workspace Prometheus data source when prompted. NetworkPolicy permits the
+metrics agent in `kube-system` to scrape the application.
 
-The deployment workflow runs the equivalent of:
-
-```powershell
-helm upgrade --install monitoring prometheus-community/kube-prometheus-stack `
-  --version 86.0.1 --namespace monitoring --create-namespace `
-  --values monitoring/kube-prometheus-stack-values.yaml --wait
-kubectl apply -k monitoring
-```
-
-These commands are documentation only until infrastructure is deployed. The
-current profile uses one Prometheus replica, six-hour retention, ephemeral
-storage, no Alertmanager, and no persistent Grafana volume. Those choices avoid
-additional Azure disks and paid ingestion but are not production-grade.
+The deployment workflow applies `kubectl apply -k monitoring` after AKS has
+enabled managed metrics. No Helm repository or in-cluster Prometheus/Grafana
+workload is used.

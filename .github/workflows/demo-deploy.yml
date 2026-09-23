@@ -22,6 +22,14 @@ on:
           - key-vault-bootstrap
           - full
           - secure
+      target_environment:
+        description: "Deployment environment; dev uses the dev branch and prod uses main"
+        required: true
+        default: prod
+        type: choice
+        options:
+          - dev
+          - prod
 
 permissions: #workflow permissions
   contents: read #read repo
@@ -29,7 +37,7 @@ permissions: #workflow permissions
   packages: read #read GHCR container image 
 
 concurrency: #prevent 2 deployments from running at the same time
-  group: terraform-demo-development
+  group: terraform-demo-${{ inputs.target_environment }}
   cancel-in-progress: false
 
 env: # define environment variables for all jobs
@@ -43,7 +51,6 @@ env: # define environment variables for all jobs
   TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
   TF_VAR_location: francecentral
   TF_VAR_project_name: alz
-  TF_VAR_environment: dev
   TF_VAR_owner: cyrine
   TF_VAR_role_assignments: '{}'
   TF_VAR_resource_group_locks: '{}'
@@ -59,14 +66,19 @@ jobs:
   plan:
     name: Create and save Terraform plan
     runs-on: ubuntu-latest
-    environment: demo-plan
+    environment: demo-${{ inputs.target_environment }}-plan
 
     steps:
-      - name: Require the controlled branch
-        if: github.ref != 'refs/heads/main' #only allow deployments from main branch
+      - name: Require the branch for the selected environment
         run: |
-          echo "Deployment operations are allowed only from main."
-          exit 1
+          if [[ "${{ inputs.target_environment }}" == "dev" && "${{ github.ref }}" != "refs/heads/dev" ]]; then
+            echo "Development deployments are allowed only from dev."
+            exit 1
+          fi
+          if [[ "${{ inputs.target_environment }}" == "prod" && "${{ github.ref }}" != "refs/heads/main" ]]; then
+            echo "Production deployments are allowed only from main."
+            exit 1
+          fi
 
       - name: Reject destroy while secure locks are enabled
         if: inputs.action == 'destroy' && inputs.profile == 'secure' #secure profile cannot be destroyed without first removing the resource group locks
@@ -93,11 +105,13 @@ jobs:
         shell: bash
         env:
           PROFILE: ${{ inputs.profile }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
           AKS_DEPLOYER_OBJECT_ID: ${{ vars.AZURE_PRINCIPAL_OBJECT_ID }}
           PLATFORM_ADMIN_GROUP_ID: ${{ vars.PLATFORM_ADMIN_GROUP_OBJECT_ID }}
           NETWORK_OPERATOR_GROUP_ID: ${{ vars.NETWORK_OPERATOR_GROUP_OBJECT_ID }}
           SECURITY_READER_GROUP_ID: ${{ vars.SECURITY_READER_GROUP_OBJECT_ID }}
           KEY_VAULT_BOOTSTRAP_OBJECT_ID: ${{ vars.KEY_VAULT_BOOTSTRAP_PRINCIPAL_OBJECT_ID }}
+          P4D_BACKEND_URL: ${{ vars.P4D_BACKEND_URL }}
         run: |
           case "$PROFILE" in
             core)
@@ -115,6 +129,7 @@ jobs:
           esac
           read -r key_vault private_endpoint aks edge apim public_access locks purge waf <<< "$values"
           {
+            echo "TF_VAR_environment=$TARGET_ENVIRONMENT"
             echo "TF_VAR_enable_key_vault=$key_vault"
             echo "TF_VAR_enable_key_vault_private_endpoint=$private_endpoint"
             echo "TF_VAR_enable_aks_demo=$aks"
@@ -130,6 +145,7 @@ jobs:
           if [[ -n "$NETWORK_OPERATOR_GROUP_ID" ]]; then echo "TF_VAR_network_operator_group_object_id=$NETWORK_OPERATOR_GROUP_ID" >> "$GITHUB_ENV"; fi
           if [[ -n "$SECURITY_READER_GROUP_ID" ]]; then echo "TF_VAR_security_reader_group_object_id=$SECURITY_READER_GROUP_ID" >> "$GITHUB_ENV"; fi
           if [[ "$PROFILE" == "key-vault-bootstrap" && -n "$KEY_VAULT_BOOTSTRAP_OBJECT_ID" ]]; then echo "TF_VAR_key_vault_bootstrap_principal_object_id=$KEY_VAULT_BOOTSTRAP_OBJECT_ID" >> "$GITHUB_ENV"; fi
+          if [[ -n "$P4D_BACKEND_URL" ]]; then echo "TF_VAR_p4d_backend_url=$P4D_BACKEND_URL" >> "$GITHUB_ENV"; fi
 
       - name: Initialize persistent Azure Blob state
         run: >-
@@ -168,7 +184,7 @@ jobs:
     if: inputs.action == 'apply' || inputs.action == 'destroy'
     needs: plan
     runs-on: ubuntu-latest
-    environment: demo-apply
+    environment: demo-${{ inputs.target_environment }}-apply
 
     steps:
       - name: Checkout repository
@@ -216,14 +232,15 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy the exact CI image and monitoring
+      - name: Deploy the exact frontend image, ingress, and managed-metrics scrape configuration
         if: inputs.action == 'apply' && (inputs.profile == 'full' || inputs.profile == 'secure')
         shell: pwsh
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          P4D_BACKEND_URL: ${{ vars.P4D_BACKEND_URL }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $repository = "ghcr.io/$($env:GITHUB_REPOSITORY_OWNER.ToLowerInvariant())/landing-zone-demo-app"
+          $repository = "ghcr.io/$($env:GITHUB_REPOSITORY_OWNER.ToLowerInvariant())/landing-zone-demo-frontend"
           $taggedImage = "${repository}:$env:GITHUB_SHA"
           $env:GHCR_TOKEN | docker login ghcr.io --username $env:GITHUB_ACTOR --password-stdin
           docker pull $taggedImage
@@ -234,7 +251,14 @@ jobs:
           $networking = terraform -chdir=terraform/root output -json networking | ConvertFrom-Json
           $security = terraform -chdir=terraform/root output -json security_baseline | ConvertFrom-Json
           $foundation = terraform -chdir=terraform/root output -json foundation | ConvertFrom-Json
+          $observability = terraform -chdir=terraform/root output -json observability | ConvertFrom-Json
           $backendIp = $workloads.application_backend_url.Replace('http://', '')
+
+          if (-not $observability.azure_monitor_workspace.id -or -not $observability.managed_grafana.id) {
+            throw 'Azure-managed monitoring outputs are missing.'
+          }
+          az resource show --ids $observability.azure_monitor_workspace.id --api-version 2023-04-03 | Out-Null
+          az resource show --ids $observability.managed_grafana.id --api-version 2023-09-01 | Out-Null
 
           az aks install-cli
           az aks get-credentials --resource-group $foundation.resource_groups.foundation.name --name $workloads.aks_cluster.name --overwrite-existing
@@ -258,35 +282,39 @@ jobs:
             -ApimSubnetCidr $networking.subnets.apim.address_prefixes[0] `
             -AksSubnetCidr $networking.subnets.aks.address_prefixes[0] `
             -PrivateEndpointSubnetCidr $networking.subnets.'private-endpoints'.address_prefixes[0] `
+            -BackendApiUrl $env:P4D_BACKEND_URL `
             -OutputPath "$env:RUNNER_TEMP/rendered-manifests.yaml"
 
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo update
-          helm upgrade --install monitoring prometheus-community/kube-prometheus-stack `
-            --version 86.0.1 `
-            --namespace monitoring `
-            --create-namespace `
-            --values monitoring/kube-prometheus-stack-values.yaml `
-            --wait `
-            --timeout 15m
-          kubectl apply -k monitoring
           kubectl apply -f "$env:RUNNER_TEMP/rendered-manifests.yaml"
-          kubectl rollout status deployment/landing-zone-demo-app --namespace demo --timeout 10m
+          kubectl wait --for=condition=Available nginxingresscontroller/alz-internal --timeout=10m
+          kubectl apply -k monitoring
+          kubectl rollout status deployment/landing-zone-demo-frontend --namespace demo --timeout 10m
 
-          $loadBalancerReady = $false
+          $ingressReady = $false
           for ($attempt = 1; $attempt -le 60; $attempt++) {
-            $assignedIp = kubectl get service landing-zone-demo-app --namespace demo -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+            $assignedIp = kubectl get ingress landing-zone-demo-frontend --namespace demo -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
             if ($assignedIp -eq $backendIp) {
-              $loadBalancerReady = $true
+              $ingressReady = $true
               break
             }
             Start-Sleep -Seconds 10
           }
-          if (-not $loadBalancerReady) {
-            kubectl get service landing-zone-demo-app --namespace demo -o wide
-            kubectl describe service landing-zone-demo-app --namespace demo
-            throw "AKS internal LoadBalancer did not acquire expected IP $backendIp within ten minutes."
+          if (-not $ingressReady) {
+            kubectl get nginxingresscontroller alz-internal -o yaml
+            kubectl get ingress landing-zone-demo-frontend --namespace demo -o wide
+            kubectl describe ingress landing-zone-demo-frontend --namespace demo
+            throw "AKS internal ingress did not acquire expected IP $backendIp within ten minutes."
           }
+
+          kubectl get podmonitor landing-zone-demo-frontend --namespace demo
+          kubectl exec deployment/landing-zone-demo-frontend --namespace demo -- python -c "import urllib.request; assert b'demo_app_http_requests_total' in urllib.request.urlopen('http://127.0.0.1:8080/metrics').read()"
+
+      - name: P4D backend deployment interface (awaiting access)
+        if: inputs.action == 'apply' && (inputs.profile == 'full' || inputs.profile == 'secure')
+        shell: bash
+        run: |
+          echo "P4D deployment was intentionally not attempted."
+          echo "Provide the P4D access method, environment, backend URL, and APIM connectivity details before wiring p4d/dev.jps or p4d/prod.jps into CI."
 
       - name: Smoke test through Application Gateway and APIM
         if: inputs.action == 'apply' && (inputs.profile == 'full' || inputs.profile == 'secure')

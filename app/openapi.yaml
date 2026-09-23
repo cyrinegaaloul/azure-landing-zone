@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Landing Zone Demo API
+  title: Landing Zone Frontend API
   version: 1.0.0
   description: >-
     Public API surface for the demo application. Internal observability

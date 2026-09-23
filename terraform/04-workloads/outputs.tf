@@ -24,8 +24,8 @@ output "workload_identity" {
 }
 
 output "application_backend_url" {
-  description = "Internal AKS LoadBalancer URL used by API Management when AKS is enabled"
+  description = "Internal AKS ingress-controller URL used by API Management when AKS is enabled"
   value       = var.enable_aks_demo ? "http://${var.application_backend_ip}" : null
 
-  depends_on = [azurerm_kubernetes_cluster.aks]
+  depends_on = [azapi_update_resource.aks_managed_prometheus]
 }

@@ -1,0 +1,15 @@
+# This CRD is supplied by the AKS Azure Monitor metrics add-on.
+apiVersion: azmonitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: landing-zone-demo-frontend
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: landing-zone-demo-frontend
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

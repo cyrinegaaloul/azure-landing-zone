@@ -1,20 +1,18 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: landing-zone-demo-app
+  name: landing-zone-demo-frontend
   namespace: demo
   labels:
-    app: landing-zone-demo-app
-  annotations:
-    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
-    service.beta.kubernetes.io/azure-load-balancer-internal-subnet: "REPLACE_WITH_AKS_SUBNET_NAME"
-    service.beta.kubernetes.io/azure-load-balancer-ipv4: "REPLACE_WITH_AKS_BACKEND_IP"
+    app: landing-zone-demo-frontend
 spec:
   selector:
-    app: landing-zone-demo-app
+    app: landing-zone-demo-frontend
   ports:
     - name: http
       protocol: TCP
       port: 80 # Service port
       targetPort: 8080 # Pod port
-  type: LoadBalancer
+  # Only the managed ingress controller has a private LoadBalancer. This
+  # backend remains cluster-internal and cannot be reached directly from APIM.
+  type: ClusterIP

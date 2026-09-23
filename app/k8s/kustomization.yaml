@@ -7,4 +7,6 @@ resources:
   - secretproviderclass.yaml
   - deployment.yaml
   - service.yaml
+  - ingress-controller.yaml
+  - ingress.yaml
   - networkpolicy.yaml

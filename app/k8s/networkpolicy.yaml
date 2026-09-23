@@ -1,12 +1,12 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: landing-zone-demo-app
+  name: landing-zone-demo-frontend
   namespace: demo
 spec:
   podSelector:
     matchLabels:
-      app: landing-zone-demo-app
+      app: landing-zone-demo-frontend
   policyTypes:
     - Ingress
     - Egress
@@ -18,7 +18,7 @@ spec:
             cidr: REPLACE_WITH_AKS_SUBNET_CIDR
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: monitoring
+              kubernetes.io/metadata.name: kube-system
       ports:
         - protocol: TCP
           port: 8080

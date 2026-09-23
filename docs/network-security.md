@@ -6,7 +6,7 @@
 |---|---|---|
 | `management` | `10.10.0.0/24` | Reserved administrator path; disabled by default. |
 | `private-endpoints` | `10.10.1.0/24` | Key Vault private endpoint with NSG policy enabled. |
-| `aks` | `10.10.2.0/24` | AKS nodes, Azure CNI pods, and internal LoadBalancer. |
+| `aks` | `10.10.2.0/24` | AKS nodes, Azure CNI pods, and internal ingress LoadBalancer. |
 | `appgw` | `10.10.3.0/24` | Dedicated Application Gateway v2 subnet. |
 | `apim` | `10.10.4.0/24` | Internal API Management subnet. |
 
@@ -36,8 +36,9 @@ default VNet rules cover same-subnet traffic and Azure-provided DNS, avoiding
 wildcard custom rules and invalid `AzurePlatformDNS` allow rules.
 
 Internet has no direct APIM or AKS listener: APIM uses internal VNet mode and
-the Kubernetes Service is an internal LoadBalancer. Application Gateway is the
-only public frontend. NSGs are stateful, so response traffic does not need
+the AKS Application Routing controller is an internal LoadBalancer; the
+application Service is ClusterIP-only. Application Gateway is the only public
+frontend. NSGs are stateful, so response traffic does not need
 mirrored rules.
 
 ## Private endpoint DNS
@@ -50,7 +51,7 @@ the allow/deny rules are effective.
 
 ## Kubernetes NetworkPolicy
 
-The application policy allows APIM traffic, AKS node/probe traffic, Prometheus
+The application policy allows AKS ingress traffic, Azure Monitor metrics-agent
 scraping, DNS, and private-endpoint HTTPS. Other selected-pod ingress and egress
 is denied. Workload Identity token projection and the node-level CSI provider
 remain functional because the policy selects only the application pod.

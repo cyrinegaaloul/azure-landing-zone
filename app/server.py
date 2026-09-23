@@ -4,27 +4,23 @@ import time
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from urllib.error import URLError
 from urllib.parse import urlsplit
+from urllib.request import urlopen
 
 
 START_TIME = time.time()
-APP_NAME = os.getenv("APP_NAME", "landing-zone-demo-app")
+APP_NAME = os.getenv("APP_NAME", "landing-zone-demo-frontend")
 APP_ENV = os.getenv("APP_ENV", "dev")
 APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
 APP_MOUNTED_FILE_PATH = Path(os.getenv("APP_MOUNTED_FILE_PATH", "/mnt/secrets-store/demo-secret"))
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "").rstrip("/")
 HOST = os.getenv("APP_HOST", "0.0.0.0")
 PORT = int(os.getenv("APP_PORT", "8080"))
 
 REQUEST_TOTAL = defaultdict(int)
 REQUEST_ERRORS = defaultdict(int)
 REQUEST_LATENCY_SUM = defaultdict(float)
-
-SAMPLE_SERVICES = [
-    {"name": "foundation", "status": "implemented", "description": "Resource groups, naming, and tags"},
-    {"name": "networking", "status": "implemented", "description": "VNet, subnets, and enforced NSG paths"},
-    {"name": "security-baseline", "status": "implemented", "description": "RBAC, private Key Vault, and optional locks"},
-    {"name": "aks", "status": "implemented", "description": "Entra-integrated application platform"},
-]
 
 KNOWN_PATHS = {"/", "/api/info", "/api/status", "/health", "/metrics", "/secret-status"}
 
@@ -40,6 +36,18 @@ def secret_is_mounted(secret_path=APP_MOUNTED_FILE_PATH):
             return bool(secret_file.read(1))
     except (FileNotFoundError, IsADirectoryError, PermissionError, OSError):
         return False
+
+
+def backend_health(backend_api_url=BACKEND_API_URL):
+    """Return backend availability without embedding backend logic in the frontend."""
+    if not backend_api_url:
+        return {"configured": False, "reachable": False}
+
+    try:
+        with urlopen(f"{backend_api_url}/health", timeout=2) as response:
+            return {"configured": True, "reachable": response.status == 200}
+    except (URLError, OSError, ValueError):
+        return {"configured": True, "reachable": False}
 
 
 def record_request(path, status, duration_seconds):
@@ -71,7 +79,7 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
         self.metric_path = normalized_path(self.path)
 
         if self.metric_path == "/":
-            self._send_json({"name": APP_NAME, "environment": APP_ENV, "version": APP_VERSION, "message": "Azure landing zone demo application is running."})
+            self._send_json({"name": APP_NAME, "environment": APP_ENV, "version": APP_VERSION, "message": "Landing zone frontend is running."})
             return
 
         if self.metric_path == "/api/info":
@@ -79,13 +87,13 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
                 {
                     "application": {"name": APP_NAME, "environment": APP_ENV, "version": APP_VERSION},
                     "platform": {"runtime": "python-stdlib-httpserver", "container_ready": True, "kubernetes_ready": True},
-                    "project": {"title": "Secure Azure Landing Zone", "focus": "Layered, cost-aware final demo"},
+                    "backend_api_url_configured": bool(BACKEND_API_URL),
                 }
             )
             return
 
         if self.metric_path == "/api/status":
-            self._send_json({"status": "ok", "uptime_seconds": round(time.time() - START_TIME, 2), "services": SAMPLE_SERVICES})
+            self._send_json({"status": "ok", "uptime_seconds": round(time.time() - START_TIME, 2), "backend": backend_health()})
             return
 
         if self.metric_path == "/health":
@@ -104,9 +112,6 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
                 "# HELP demo_app_uptime_seconds Uptime of the demo app in seconds.",
                 "# TYPE demo_app_uptime_seconds gauge",
                 f"demo_app_uptime_seconds {time.time() - START_TIME:.6f}",
-                "# HELP demo_app_services_total Number of platform services represented by the demo.",
-                "# TYPE demo_app_services_total gauge",
-                f"demo_app_services_total {len(SAMPLE_SERVICES)}",
                 "# HELP demo_app_http_requests_total HTTP requests by path and status.",
                 "# TYPE demo_app_http_requests_total counter",
             ]

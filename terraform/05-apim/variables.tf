@@ -72,7 +72,7 @@ variable "apim_sku_name" {
 }
 
 variable "backend_url" {
-  description = "Internal AKS LoadBalancer URL used as the imported API backend."
+  description = "Internal AKS ingress-controller URL used as the frontend API backend."
   type        = string
   default     = null
   nullable    = true
@@ -81,6 +81,23 @@ variable "backend_url" {
     condition     = !var.enable_apim || try(startswith(var.backend_url, "http://") || startswith(var.backend_url, "https://"), false)
     error_message = "backend_url must be a non-null HTTP(S) URL when API Management is enabled."
   }
+}
+
+variable "p4d_backend_url" {
+  description = "Optional HTTP(S) URL for the P4D backend. Leave null until P4D connectivity details are confirmed."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.p4d_backend_url == null || startswith(var.p4d_backend_url, "http://") || startswith(var.p4d_backend_url, "https://")
+    error_message = "p4d_backend_url must be null or an HTTP(S) URL."
+  }
+}
+
+variable "p4d_openapi_spec_path" {
+  description = "Path to the OpenAPI document for the P4D backend API."
+  type        = string
 }
 
 variable "apim_subnet_id" {

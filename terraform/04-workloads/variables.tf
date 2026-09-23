@@ -50,8 +50,14 @@ variable "aks_node_vm_size" {
 }
 
 variable "application_backend_ip" {
-  description = "Static private IP reserved for the application's internal Kubernetes LoadBalancer"
+  description = "Static private IP reserved for the internal AKS Application Routing ingress controller"
   type        = string
+}
+
+variable "azure_monitor_workspace_id" {
+  description = "Azure Monitor Workspace resource ID used by AKS managed Prometheus"
+  type        = string
+  nullable    = true
 }
 
 variable "tenant_id" {

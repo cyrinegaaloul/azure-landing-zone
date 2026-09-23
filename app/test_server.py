@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import mock_open, patch
 
-from server import normalized_path, secret_is_mounted
+from server import backend_health, normalized_path, secret_is_mounted
 
 
 class ServerHelpersTest(unittest.TestCase):
@@ -21,6 +21,9 @@ class ServerHelpersTest(unittest.TestCase):
             self.assertIs(secret_is_mounted(Path("missing")), False)
         with patch.object(Path, "open", mock_open(read_data=b"")):
             self.assertIs(secret_is_mounted(Path("empty")), False)
+
+    def test_empty_backend_url_does_not_make_frontend_unhealthy(self):
+        self.assertEqual(backend_health(""), {"configured": False, "reachable": False})
 
 
 if __name__ == "__main__":

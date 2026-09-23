@@ -7,8 +7,9 @@ containerized demonstration workload. The deployed application path is:
 Internet (HTTP development endpoint)
   -> Application Gateway WAF_v2
   -> API Management Developer tier (internal VNet mode, HTTPS)
-  -> AKS internal LoadBalancer
-  -> non-root application pod
+  -> AKS Application Routing internal ingress
+  -> frontend ClusterIP Service -> frontend pod
+  -> optional P4D backend route through APIM
   -> Workload Identity + Secrets Store CSI
   -> private Azure Key Vault endpoint
 ```
@@ -29,12 +30,21 @@ a simulated feature.
 | `terraform/03-edge/` | Application Gateway WAF_v2 and public IP. |
 | `terraform/04-workloads/` | AKS, Workload Identity, federation, and Key Vault RBAC. |
 | `terraform/05-apim/` | Internal APIM instance and imported demo API. |
+| `terraform/06-observability/` | Azure Monitor Workspace and Azure Managed Grafana. |
 | `terraform/root/` | Composition, profiles, cross-module traffic rules, and outputs. |
 | `app/` | Python service, Dockerfile, OpenAPI contract, and Kubernetes base. |
+| `backend/` | Portable P4D backend API, Dockerfile, OpenAPI contract, and tests. |
+| `p4d/` | Parameterized, untested P4D/Jelastic backend deployment manifests. |
 | `scripts/` | Deployment-time Kubernetes rendering. |
-| `monitoring/` | kube-prometheus-stack values, ServiceMonitor, and Grafana dashboard. |
+| `monitoring/` | Azure Monitor managed-Prometheus scrape configuration and Grafana dashboard. |
 | `.github/workflows/` | Gated CI/image publication and controlled deployment. |
 | `docs/` | Networking, security, edge, APIM, and state details. |
+
+The current application and monitoring architecture is documented in
+[Managed ingress and observability](docs/observability.md).
+
+Frontend/backend and P4D integration boundaries are documented in
+[P4D integration preparation](docs/p4d-integration.md).
 
 ## Functional profiles
 
@@ -57,7 +67,7 @@ the internship environment remains intentionally destroyable.
 - Terraform 1.14 or later
 - Azure CLI and an Azure subscription
 - Docker for local image validation
-- `kubectl`, `kubelogin`, and Helm only for a later deployed environment
+- `kubectl` and `kubelogin` only for a later deployed environment
 - Permission to create a user-assigned managed identity and Azure role assignments
 - GHCR access for automation
 
@@ -118,8 +128,9 @@ workflow. It creates a saved plan, uploads it for review, and requires the
 1. resolve the CI-published SHA image to its immutable digest;
 2. obtain Terraform outputs without committing GUIDs or generated addresses;
 3. render Kubernetes configuration and reject remaining placeholders;
-4. install the pinned monitoring chart and provision its dashboard;
-5. deploy the application, wait for rollout, and smoke-test through App Gateway.
+4. apply the Azure Monitor managed-Prometheus scrape configuration;
+5. deploy the application, wait for its internal ingress and rollout, and
+   smoke-test through App Gateway.
 
 Create `demo-secret` during the Key Vault bootstrap stage. Never commit its
 value. Detailed prerequisites are in [pipeline documentation](pipelines/README.md).
@@ -164,16 +175,17 @@ remain visible but do not block this development image.
 | Private DNS zone | Resolve the vault hostname privately | Low/negligible | Disabled with the endpoint |
 | VNet DNS link/zone group | Integrate DNS and endpoint | No or negligible separate charge | Disabled with the endpoint |
 
-Application Gateway WAF_v2, APIM Developer, AKS, and the internal load balancer
-remain the dominant costs. The `core` and bootstrap profiles avoid them.
+Application Gateway WAF_v2, APIM Developer, AKS, Azure Managed Grafana, and
+managed Prometheus ingestion remain the dominant costs. The `core` and bootstrap
+profiles avoid them.
 
 ## Development limitations
 
 - The public frontend is HTTP until an owned domain and trusted certificate are
   available.
 - AKS uses a public API endpoint; optional authorized CIDRs can reduce exposure.
-- The single small node, ephemeral Prometheus data, disabled Alertmanager, and
-  APIM Developer tier are deliberate non-production choices.
+- Azure Managed Grafana uses a public Microsoft-managed endpoint; access is
+  controlled with Microsoft Entra rather than Kubernetes port-forwarding.
 - GitHub-hosted runners require the state storage data endpoint to be publicly
   reachable; Entra RBAC, disabled shared keys, TLS, and private containers still
   protect access. A private runner would enable a private storage endpoint.

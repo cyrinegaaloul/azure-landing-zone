@@ -1,6 +1,7 @@
 locals {
-  apim_name = "apim-${var.project_name}-${var.environment}-${var.owner}"
-  api_name  = "landing-zone-demo-api"
+  apim_name    = "apim-${var.project_name}-${var.environment}-${var.owner}"
+  api_name     = "landing-zone-demo-api"
+  p4d_api_name = "landing-zone-demo-backend-api"
 
   endpoint_hostnames = {
     gateway = "${local.apim_name}.azure-api.net"
@@ -76,6 +77,27 @@ resource "azurerm_api_management_api" "this" {
   }
 }
 
+# The P4D route is intentionally absent until its real URL is supplied. This
+# preserves the current working frontend route and avoids fabricated endpoints.
+resource "azurerm_api_management_api" "p4d_backend" {
+  count = var.enable_apim && var.p4d_backend_url != null ? 1 : 0
+
+  name                  = local.p4d_api_name
+  resource_group_name   = var.resource_group_name
+  api_management_name   = azurerm_api_management.this[0].name
+  revision              = "1"
+  display_name          = "Landing Zone P4D Backend API"
+  path                  = "backend"
+  protocols             = ["http", "https"]
+  service_url           = var.p4d_backend_url
+  subscription_required = false
+
+  import {
+    content_format = "openapi"
+    content_value  = file(var.p4d_openapi_spec_path)
+  }
+}
+
 resource "azurerm_api_management_api_policy" "this" {
   count = var.enable_apim ? 1 : 0
 
@@ -104,6 +126,29 @@ resource "azurerm_api_management_api_policy" "this" {
       <on-error>
         <base />
       </on-error>
+    </policies>
+  XML
+}
+
+resource "azurerm_api_management_api_policy" "p4d_backend" {
+  count = var.enable_apim && var.p4d_backend_url != null ? 1 : 0
+
+  api_name            = azurerm_api_management_api.p4d_backend[0].name
+  api_management_name = azurerm_api_management.this[0].name
+  resource_group_name = var.resource_group_name
+
+  xml_content = <<-XML
+    <policies>
+      <inbound>
+        <base />
+        <rate-limit-by-key calls="30" renewal-period="60" counter-key="@(context.Request.IpAddress)" />
+        <set-header name="X-Correlation-ID" exists-action="skip">
+          <value>@(context.RequestId.ToString())</value>
+        </set-header>
+      </inbound>
+      <backend><forward-request /></backend>
+      <outbound><base /></outbound>
+      <on-error><base /></on-error>
     </policies>
   XML
 }

@@ -1,10 +1,19 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Azure Monitor Workspace Prometheus",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
   "annotations": {"list": []},
   "editable": true,
   "graphTooltip": 1,
   "panels": [
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
       "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0},
       "id": 1,
@@ -13,7 +22,7 @@
       "type": "stat"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
       "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0},
       "id": 2,
@@ -22,7 +31,7 @@
       "type": "stat"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
       "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0},
       "id": 3,
@@ -31,7 +40,7 @@
       "type": "stat"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
       "id": 4,
@@ -40,31 +49,31 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {"defaults": {"unit": "cores"}, "overrides": []},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
       "id": 5,
-      "targets": [{"expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"demo\",container=\"landing-zone-demo-app\"}[5m]))", "legendFormat": "CPU", "refId": "A"}],
+      "targets": [{"expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"demo\",container=\"landing-zone-demo-frontend\"}[5m]))", "legendFormat": "CPU", "refId": "A"}],
       "title": "Pod CPU usage",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
       "id": 6,
-      "targets": [{"expr": "sum(container_memory_working_set_bytes{namespace=\"demo\",container=\"landing-zone-demo-app\"})", "legendFormat": "memory", "refId": "A"}],
+      "targets": [{"expr": "sum(container_memory_working_set_bytes{namespace=\"demo\",container=\"landing-zone-demo-frontend\"})", "legendFormat": "memory", "refId": "A"}],
       "title": "Pod memory usage",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {"defaults": {"decimals": 0}, "overrides": []},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
       "id": 7,
       "targets": [
-        {"expr": "kube_deployment_spec_replicas{namespace=\"demo\",deployment=\"landing-zone-demo-app\"}", "legendFormat": "desired", "refId": "A"},
-        {"expr": "kube_deployment_status_replicas_available{namespace=\"demo\",deployment=\"landing-zone-demo-app\"}", "legendFormat": "available", "refId": "B"}
+        {"expr": "kube_deployment_spec_replicas{namespace=\"demo\",deployment=\"landing-zone-demo-frontend\"}", "legendFormat": "desired", "refId": "A"},
+        {"expr": "kube_deployment_status_replicas_available{namespace=\"demo\",deployment=\"landing-zone-demo-frontend\"}", "legendFormat": "available", "refId": "B"}
       ],
       "title": "Deployment replicas",
       "type": "timeseries"
@@ -77,6 +86,6 @@
   "time": {"from": "now-15m", "to": "now"},
   "timezone": "browser",
   "title": "Landing Zone Demo Application",
-  "uid": "landing-zone-demo-app",
+  "uid": "landing-zone-demo-frontend",
   "version": 2
 }

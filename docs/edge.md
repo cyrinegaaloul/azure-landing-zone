@@ -1,8 +1,9 @@
 # Application Gateway Edge
 
 `terraform/03-edge` creates a Terraform-owned Standard_v2 public IP,
-Application Gateway WAF_v2, and WAF policy. It does not use AGIC or a Kubernetes
-Ingress resource.
+Application Gateway WAF_v2, and WAF policy. It does not use AGIC and is not
+controlled by Kubernetes. The AKS Application Routing ingress is downstream of
+APIM and does not manage this Application Gateway.
 
 ## Routing
 
