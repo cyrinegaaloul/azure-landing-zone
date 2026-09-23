@@ -400,12 +400,12 @@ module "workloads" {
 module "observability" {
   source = "../06-observability"
 
-  location            = module.foundation.location
-  project_name        = var.project_name
-  environment         = var.environment
-  resource_group_name = module.foundation.resource_groups.foundation.name
-  common_tags         = module.foundation.common_tags
-  enabled             = var.enable_aks_demo
+  location                       = module.foundation.location
+  project_name                   = var.project_name
+  environment                    = var.environment
+  resource_group_name            = module.foundation.resource_groups.foundation.name
+  common_tags                    = module.foundation.common_tags
+  enabled                        = var.enable_aks_demo
   platform_admin_group_object_id = var.platform_admin_group_object_id
 }
 
