@@ -322,6 +322,16 @@ jobs:
 
           kubectl apply -f "$env:RUNNER_TEMP/rendered-manifests.yaml"
           kubectl wait --for=condition=Available nginxingresscontroller/alz-internal --timeout=10m
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Application Routing controller diagnostics:"
+            kubectl get nginxingresscontroller alz-internal -o yaml
+            kubectl get deployment,pods,service --namespace app-routing-system -o wide
+            kubectl describe deployment alz-internal-0 --namespace app-routing-system
+            kubectl describe pods --namespace app-routing-system -l app.kubernetes.io/instance=alz-internal-0
+            kubectl get events --namespace app-routing-system --sort-by=.lastTimestamp
+            kubectl logs deployment/alz-internal-0 --namespace app-routing-system --all-containers --tail=200
+            throw "AKS Application Routing controller did not become available within ten minutes. Review the controller diagnostics above."
+          }
           kubectl apply -k monitoring
           kubectl rollout status deployment/landing-zone-demo-frontend --namespace demo --timeout 10m
 
