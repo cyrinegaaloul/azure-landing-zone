@@ -5,6 +5,11 @@ metadata:
   name: landing-zone-demo-frontend
   namespace: demo
 spec:
+  # Azure Managed Prometheus requires explicit label limits on custom
+  # PodMonitor resources; without them the custom scrape can be discarded.
+  labelLimit: 63
+  labelNameLengthLimit: 511
+  labelValueLengthLimit: 1023
   selector:
     matchLabels:
       app: landing-zone-demo-frontend
