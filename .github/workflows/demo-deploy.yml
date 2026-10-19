@@ -113,11 +113,10 @@ jobs:
           PLATFORM_ADMIN_GROUP_ID: ${{ vars.PLATFORM_ADMIN_GROUP_OBJECT_ID }}
           NETWORK_OPERATOR_GROUP_ID: ${{ vars.NETWORK_OPERATOR_GROUP_OBJECT_ID }}
           SECURITY_READER_GROUP_ID: ${{ vars.SECURITY_READER_GROUP_OBJECT_ID }}
-          KEY_VAULT_BOOTSTRAP_OBJECT_ID: ${{ vars.KEY_VAULT_BOOTSTRAP_PRINCIPAL_OBJECT_ID }}
           P4D_BACKEND_URL: ${{ vars.P4D_BACKEND_URL }}
         run: |
-          if [[ "$PROFILE" == "full" || "$PROFILE" == "secure" ]] && [[ -z "$AKS_DEPLOYER_OBJECT_ID" ]]; then
-            echo "AZURE_PRINCIPAL_OBJECT_ID must be configured as an Environment variable for full and secure deployments. Use the GitHub deployment identity's Microsoft Entra principal (object) ID, not its client ID."
+          if [[ "$PROFILE" == "full" || "$PROFILE" == "secure" || "$PROFILE" == "key-vault-bootstrap" ]] && [[ -z "$AKS_DEPLOYER_OBJECT_ID" ]]; then
+            echo "AZURE_PRINCIPAL_OBJECT_ID must be configured as an Environment variable for key-vault-bootstrap, full, and secure deployments. Use the GitHub deployment identity's Microsoft Entra principal (object) ID, not its client ID."
             exit 1
           fi
 
@@ -152,7 +151,12 @@ jobs:
           if [[ -n "$PLATFORM_ADMIN_GROUP_ID" ]]; then echo "TF_VAR_platform_admin_group_object_id=$PLATFORM_ADMIN_GROUP_ID" >> "$GITHUB_ENV"; fi
           if [[ -n "$NETWORK_OPERATOR_GROUP_ID" ]]; then echo "TF_VAR_network_operator_group_object_id=$NETWORK_OPERATOR_GROUP_ID" >> "$GITHUB_ENV"; fi
           if [[ -n "$SECURITY_READER_GROUP_ID" ]]; then echo "TF_VAR_security_reader_group_object_id=$SECURITY_READER_GROUP_ID" >> "$GITHUB_ENV"; fi
-          if [[ "$PROFILE" == "key-vault-bootstrap" && -n "$KEY_VAULT_BOOTSTRAP_OBJECT_ID" ]]; then echo "TF_VAR_key_vault_bootstrap_principal_object_id=$KEY_VAULT_BOOTSTRAP_OBJECT_ID" >> "$GITHUB_ENV"; fi
+          # During the bootstrap profile, the GitHub OIDC identity receives a
+          # temporary, vault-scoped Secrets Officer assignment. The apply job
+          # uses it to create demo-secret without exposing a secret value in
+          # Terraform, GitHub settings, or a human shell history. The full
+          # profile omits this variable, so Terraform removes the assignment.
+          if [[ "$PROFILE" == "key-vault-bootstrap" ]]; then echo "TF_VAR_key_vault_bootstrap_principal_object_id=$AKS_DEPLOYER_OBJECT_ID" >> "$GITHUB_ENV"; fi
           if [[ -n "$P4D_BACKEND_URL" ]]; then echo "TF_VAR_p4d_backend_url=$P4D_BACKEND_URL" >> "$GITHUB_ENV"; fi
 
       - name: Initialize persistent Azure Blob state
@@ -240,6 +244,39 @@ jobs:
 
       - name: Apply saved plan
         run: terraform -chdir=terraform/root apply -input=false tfplan
+
+      - name: Create the Key Vault demo secret during bootstrap
+        if: inputs.action == 'apply' && inputs.profile == 'key-vault-bootstrap'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $security = terraform -chdir=terraform/root output -json security_baseline | ConvertFrom-Json
+          $vaultName = $security.name
+          if (-not $vaultName) {
+            throw 'The Key Vault bootstrap plan completed without a Key Vault output.'
+          }
+
+          # The role assignment is part of the reviewed Terraform plan, but
+          # Azure RBAC takes time to propagate. Reuse an existing secret when
+          # a bootstrap run is repeated; otherwise generate an unlogged value.
+          $existingSecretId = az keyvault secret show --vault-name $vaultName --name demo-secret --query id --output tsv --only-show-errors 2>$null
+          if ($LASTEXITCODE -eq 0 -and $existingSecretId) {
+            Write-Host "demo-secret already exists in Key Vault; no replacement was created."
+            exit 0
+          }
+
+          for ($attempt = 1; $attempt -le 60; $attempt++) {
+            Write-Host "Waiting for Key Vault RBAC and creating demo-secret ($attempt/60)..."
+            $secretValue = [guid]::NewGuid().ToString('N')
+            az keyvault secret set --vault-name $vaultName --name demo-secret --value $secretValue --only-show-errors --output none 2>$null
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host 'demo-secret was created successfully.'
+              exit 0
+            }
+            Start-Sleep -Seconds 10
+          }
+
+          throw 'demo-secret could not be created after ten minutes. Check the bootstrap role assignment and Key Vault networking.'
 
       - name: Refresh Azure login before AKS deployment
         if: inputs.action == 'apply' && (inputs.profile == 'full' || inputs.profile == 'secure')

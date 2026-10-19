@@ -79,11 +79,10 @@ Configure these variables in **each** of the four environments:
 | `TFSTATE_STORAGE_ACCOUNT` | Yes | Backend storage account name. |
 | `TFSTATE_CONTAINER` | Yes | `tfstate`. |
 | `TFSTATE_KEY` | Yes | See the per-environment state table below. |
-| `AZURE_PRINCIPAL_OBJECT_ID` | Full profile | Principal ID, not client ID, of the GitHub deployment managed identity for AKS RBAC. |
+| `AZURE_PRINCIPAL_OBJECT_ID` | Bootstrap, full, secure | Principal ID, not client ID, of the GitHub deployment managed identity. Bootstrap uses it for the temporary Key Vault role; full/secure use it for AKS RBAC. |
 | `PLATFORM_ADMIN_GROUP_OBJECT_ID` | Full profile | Platform administrators Entra group object ID. The group receives scoped Azure Managed Grafana Administrator access and AKS RBAC cluster administration. |
 | `NETWORK_OPERATOR_GROUP_OBJECT_ID` | Optional | Network operators Entra group object ID. |
 | `SECURITY_READER_GROUP_OBJECT_ID` | Optional | Security readers Entra group object ID. |
-| `KEY_VAULT_BOOTSTRAP_PRINCIPAL_OBJECT_ID` | Bootstrap only | Human object ID temporarily granted Key Vault Secrets Officer. |
 | `P4D_BACKEND_URL` | Optional | HTTPS URL for the P4D backend APIM route. |
 
 ### State configuration: required separation
@@ -121,11 +120,13 @@ The GitHub-hosted runner keeps the normal Azure Login OIDC flow; do not set
 self-hosted runners. The GitHub deployment UAMI remains separate from the AKS
 application Workload Identity UAMI.
 
-After the bootstrap profile is applied and RBAC has propagated, the designated
-human creates `demo-secret` directly in the Azure portal. Do not pass the value
-through Terraform, GitHub, shell history, or a committed file. Then apply
-`full`; Terraform removes the temporary Secrets Officer assignment, creates the
-private endpoint, and disables public vault access.
+When `key-vault-bootstrap` is applied, the workflow temporarily grants its
+GitHub OIDC identity the vault-scoped `Key Vault Secrets Officer` role, waits
+for RBAC propagation, and creates `demo-secret` with an unlogged random value.
+It reuses an existing secret on repeat runs. Then apply `full`; Terraform removes
+the temporary role assignment, creates the private endpoint, and disables public
+vault access. Do not create or store this demo secret in Terraform variables,
+GitHub secrets, source control, or shell history.
 
 ## Profiles and lifecycle
 

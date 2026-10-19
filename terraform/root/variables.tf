@@ -300,7 +300,7 @@ variable "enable_key_vault_private_endpoint" {
 }
 
 variable "key_vault_bootstrap_principal_object_id" {
-  description = "Optional human principal object ID temporarily granted Key Vault Secrets Officer during bootstrap"
+  description = "Optional deployment principal object ID temporarily granted Key Vault Secrets Officer during bootstrap"
   type        = string
   default     = null
   nullable    = true

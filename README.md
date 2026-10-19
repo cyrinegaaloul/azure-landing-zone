@@ -58,9 +58,11 @@ Terraform rejects combinations that would create an unusable partial path.
 | `secure` | On | On | On | Off | `CanNotDelete` / Prevention |
 
 The bootstrap profile exists only to create `demo-secret` before private-only
-Key Vault networking is enabled. It does not deploy expensive application
-components. The secure profile leaves Key Vault purge protection disabled so
-the internship environment remains intentionally destroyable.
+Key Vault networking is enabled. Its GitHub Actions apply job creates a random
+unlogged value automatically after Key Vault RBAC has propagated. It does not
+deploy expensive application components. The secure profile leaves Key Vault
+purge protection disabled so the internship environment remains intentionally
+destroyable.
 
 ## Prerequisites
 
@@ -133,8 +135,9 @@ before applying the exact plan. Full deployments then:
 5. deploy the application, wait for its internal ingress and rollout, and
    smoke-test through App Gateway.
 
-Create `demo-secret` during the Key Vault bootstrap stage. Never commit its
-value. Detailed prerequisites are in [pipeline documentation](pipelines/README.md).
+For a new environment, apply `key-vault-bootstrap` once, then apply `full`.
+The bootstrap workflow creates `demo-secret` automatically; never commit or
+manually record its value. Detailed prerequisites are in [pipeline documentation](pipelines/README.md).
 
 ## Resource locks and destroy
 

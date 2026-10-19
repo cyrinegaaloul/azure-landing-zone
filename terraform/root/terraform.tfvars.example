@@ -87,7 +87,8 @@ p4d_backend_url = null
 # Key Vault bootstrap:
 #   enable_key_vault                        = true
 #   key_vault_public_network_access_enabled = true
-#   Set key_vault_bootstrap_principal_object_id locally when required.
+#   The GitHub bootstrap workflow supplies its deployment principal automatically.
+#   Set key_vault_bootstrap_principal_object_id only for a local bootstrap run.
 #
 # Full demo:
 #   enable_key_vault                        = true
